@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,10 @@ const LoginPage = () => {
   const [credentials, setCredentials] = useState({ phone: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+
+  const from = location.state?.from?.pathname || '/';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +32,7 @@ const LoginPage = () => {
         className: "bg-success text-success-foreground"
       });
 
-      navigate('/');
+      navigate(from, { replace: true });
     } catch (error) {
       toast({
         title: "خطأ في تسجيل الدخول",

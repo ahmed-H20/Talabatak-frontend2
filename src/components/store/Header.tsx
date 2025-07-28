@@ -1,8 +1,11 @@
-import { Search, ShoppingCart, Menu, MapPin } from 'lucide-react';
+import { Search, ShoppingCart, Menu, MapPin, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   cartItemCount?: number;
@@ -16,6 +19,13 @@ export const Header = ({
   onMenuClick 
 }: HeaderProps) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
   return (
     <header className="bg-background border-b border-light sticky top-0 z-40 backdrop-blur-sm bg-background/95">
@@ -58,6 +68,47 @@ export const Header = ({
               />
             </div>
           </div>
+
+          {/* User Menu / Login */}
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <User className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  مرحباً، {user?.name}
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="cursor-pointer">
+                    <User className="ml-2 h-4 w-4" />
+                    الملف الشخصي
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/orders" className="cursor-pointer">
+                    <ShoppingCart className="ml-2 h-4 w-4" />
+                    طلباتي
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+                  <LogOut className="ml-2 h-4 w-4" />
+                  تسجيل الخروج
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/auth/login">
+                <User className="ml-2 h-4 w-4" />
+                تسجيل الدخول
+              </Link>
+            </Button>
+          )}
 
           {/* Cart Button */}
           <Button
