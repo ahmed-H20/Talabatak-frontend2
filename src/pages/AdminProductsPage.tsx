@@ -13,8 +13,13 @@ import {
   Edit, 
   Trash2, 
   Search,
-  Star
+  Star,
+  Upload,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { BaseLayout } from '@/components/layout/BaseLayout';
 import { Container } from '@/components/layout/Container';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
@@ -28,6 +33,7 @@ const AdminProductsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -116,6 +122,107 @@ const AdminProductsPage = () => {
     setIsDialogOpen(true);
   };
 
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+    if (fileExtension === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          const importedProducts = results.data.map((row: any, index: number) => ({
+            id: `imported-${Date.now()}-${index}`,
+            name: row.name || row['اسم المنتج'] || '',
+            price: parseFloat(row.price || row['السعر']) || 0,
+            originalPrice: parseFloat(row.originalPrice || row['السعر الأصلي']) || undefined,
+            image: row.image || row['الصورة'] || '📦',
+            unit: row.unit || row['الوحدة'] || 'قطعة',
+            rating: parseFloat(row.rating || row['التقييم']) || 4.5,
+            reviewCount: parseInt(row.reviewCount || row['عدد التقييمات']) || 0,
+            isNew: false,
+            isFavorite: false,
+            inStock: true,
+            discount: row.originalPrice && row.price ? 
+              Math.round(((parseFloat(row.originalPrice) - parseFloat(row.price)) / parseFloat(row.originalPrice)) * 100) : 
+              undefined
+          })).filter(product => product.name && product.price > 0);
+
+          setProducts(prev => [...prev, ...importedProducts]);
+          toast({ title: `تم استيراد ${importedProducts.length} منتج بنجاح` });
+          setIsImportDialogOpen(false);
+        },
+        error: (error) => {
+          toast({ title: "خطأ في قراءة الملف", variant: "destructive" });
+          console.error('CSV parsing error:', error);
+        }
+      });
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          const importedProducts = jsonData.map((row: any, index: number) => ({
+            id: `imported-${Date.now()}-${index}`,
+            name: row.name || row['اسم المنتج'] || '',
+            price: parseFloat(row.price || row['السعر']) || 0,
+            originalPrice: parseFloat(row.originalPrice || row['السعر الأصلي']) || undefined,
+            image: row.image || row['الصورة'] || '📦',
+            unit: row.unit || row['الوحدة'] || 'قطعة',
+            rating: parseFloat(row.rating || row['التقييم']) || 4.5,
+            reviewCount: parseInt(row.reviewCount || row['عدد التقييمات']) || 0,
+            isNew: false,
+            isFavorite: false,
+            inStock: true,
+            discount: row.originalPrice && row.price ? 
+              Math.round(((parseFloat(row.originalPrice) - parseFloat(row.price)) / parseFloat(row.originalPrice)) * 100) : 
+              undefined
+          })).filter(product => product.name && product.price > 0);
+
+          setProducts(prev => [...prev, ...importedProducts]);
+          toast({ title: `تم استيراد ${importedProducts.length} منتج بنجاح` });
+          setIsImportDialogOpen(false);
+        } catch (error) {
+          toast({ title: "خطأ في قراءة ملف Excel", variant: "destructive" });
+          console.error('Excel parsing error:', error);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      toast({ title: "نوع الملف غير مدعوم. يرجى استخدام CSV أو Excel", variant: "destructive" });
+    }
+
+    // Reset input
+    event.target.value = '';
+  };
+
+  const downloadTemplate = () => {
+    const template = [
+      {
+        'اسم المنتج': 'مثال على المنتج',
+        'السعر': 100,
+        'السعر الأصلي': 120,
+        'الصورة': '📦',
+        'الوحدة': 'قطعة',
+        'التقييم': 4.5,
+        'عدد التقييمات': 25
+      }
+    ];
+
+    const csv = Papa.unparse(template);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'template_products.csv';
+    link.click();
+  };
+
   return (
     <BaseLayout dir="rtl" className="bg-surface">
       <div className="flex h-screen">
@@ -130,13 +237,62 @@ const AdminProductsPage = () => {
                 <h1 className="text-2xl font-bold">إدارة المنتجات</h1>
               </div>
               
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={openAddDialog}>
-                    <Plus className="h-4 w-4 ml-2" />
-                    إضافة منتج جديد
-                  </Button>
-                </DialogTrigger>
+              <div className="flex gap-3">
+                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Upload className="h-4 w-4" />
+                      استيراد من ملف
+                    </Button>
+                  </DialogTrigger>
+                  
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>استيراد المنتجات</DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="importFile">اختر ملف CSV أو Excel</Label>
+                        <Input
+                          id="importFile"
+                          type="file"
+                          accept=".csv,.xlsx,.xls"
+                          onChange={handleFileImport}
+                          className="mt-2"
+                        />
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        <p>الأعمدة المطلوبة:</p>
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          <li>اسم المنتج أو name</li>
+                          <li>السعر أو price</li>
+                          <li>الوحدة أو unit</li>
+                          <li>الصورة أو image (اختياري)</li>
+                          <li>التقييم أو rating (اختياري)</li>
+                        </ul>
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        onClick={downloadTemplate}
+                        className="w-full gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        تحميل ملف نموذج
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={openAddDialog}>
+                      <Plus className="h-4 w-4 ml-2" />
+                      إضافة منتج جديد
+                    </Button>
+                  </DialogTrigger>
                 
                 <DialogContent className="max-w-md">
                   <DialogHeader>
@@ -254,7 +410,8 @@ const AdminProductsPage = () => {
                     </div>
                   </form>
                 </DialogContent>
-              </Dialog>
+                </Dialog>
+              </div>
             </div>
             
             {/* Search */}

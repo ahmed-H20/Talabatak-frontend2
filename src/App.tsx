@@ -13,6 +13,10 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminOrdersPage from "./pages/AdminOrdersPage";
 import AdminProductsPage from "./pages/AdminProductsPage";
+import AdminCategoriesPage from "./pages/AdminCategoriesPage";
+import AdminStoresPage from "./pages/AdminStoresPage";
+import AdminSettingsPage from "./pages/AdminSettingsPage";
+import AdminLocationsPage from "./pages/AdminLocationsPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import VerifyPhonePage from "./pages/auth/VerifyPhonePage";
@@ -55,6 +59,10 @@ const App = () => (
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/orders" element={<AdminOrdersPage />} />
             <Route path="/admin/products" element={<AdminProductsPage />} />
+            <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+            <Route path="/admin/stores" element={<AdminStoresPage />} />
+            <Route path="/admin/locations" element={<AdminLocationsPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

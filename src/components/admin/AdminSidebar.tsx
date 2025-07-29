@@ -5,7 +5,8 @@ import {
   ShoppingCart, 
   FolderTree, 
   Settings,
-  Store
+  Store,
+  MapPin
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -31,7 +32,17 @@ const AdminSidebar = () => {
       icon: FolderTree
     },
     {
-      title: 'إعدادات المتجر',
+      title: 'المتاجر',
+      href: '/admin/stores',
+      icon: Store
+    },
+    {
+      title: 'المواقع',
+      href: '/admin/locations',
+      icon: MapPin
+    },
+    {
+      title: 'إعدادات الموقع',
       href: '/admin/settings',
       icon: Settings
     }
