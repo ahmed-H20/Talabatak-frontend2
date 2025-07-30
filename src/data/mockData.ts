@@ -17,6 +17,7 @@ export const mockProducts: Product[] = [
   {
     id: 'fruits-1',
     name: 'تفاح أحمر طازج من المزارع المحلية',
+    description: 'تفاح أحمر طازج عالي الجودة من المزارع المحلية',
     price: 12,
     originalPrice: 15,
     image: '🍎',
@@ -26,11 +27,15 @@ export const mockProducts: Product[] = [
     discount: 20,
     isNew: false,
     isFavorite: false,
-    inStock: true
+    inStock: true,
+    category: 'فواكه',
+    subCategory: 'تفاح',
+    store: 'متجر الرياض'
   },
   {
     id: 'fruits-2',
     name: 'موز عضوي طبيعي',
+    description: 'موز عضوي طبيعي غني بالفيتامينات',
     price: 8,
     image: '🍌',
     rating: 4.6,
@@ -38,11 +43,15 @@ export const mockProducts: Product[] = [
     unit: 'كيلو',
     isNew: true,
     isFavorite: true,
-    inStock: true
+    inStock: true,
+    category: 'فواكه',
+    subCategory: 'موز',
+    store: 'متجر جدة'
   },
   {
     id: 'fruits-3',
     name: 'برتقال طبيعي حلو',
+    description: 'برتقال طبيعي حلو غني بفيتامين C',
     price: 10,
     originalPrice: 12,
     image: '🍊',
@@ -52,7 +61,10 @@ export const mockProducts: Product[] = [
     discount: 17,
     isNew: false,
     isFavorite: false,
-    inStock: true
+    inStock: true,
+    category: 'فواكه',
+    subCategory: 'حمضيات',
+    store: 'متجر الدمام'
   },
   {
     id: 'fruits-4',

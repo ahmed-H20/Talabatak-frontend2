@@ -43,7 +43,9 @@ const AdminProductsPage = () => {
     image: '',
     unit: '',
     description: '',
-    category: ''
+    category: '',
+    subCategory: '',
+    store: ''
   });
 
   const filteredProducts = products.filter(product => {
@@ -58,10 +60,14 @@ const AdminProductsPage = () => {
     const productData: Product = {
       id: editingProduct?.id || `product-${Date.now()}`,
       name: formData.name,
+      description: formData.description,
       price: parseFloat(formData.price),
       originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
       image: formData.image || '📦',
       unit: formData.unit,
+      category: formData.category,
+      subCategory: formData.subCategory,
+      store: formData.store,
       rating: editingProduct?.rating || 4.5,
       reviewCount: editingProduct?.reviewCount || 0,
       isNew: !editingProduct,
@@ -90,7 +96,7 @@ const AdminProductsPage = () => {
 
     setIsDialogOpen(false);
     setEditingProduct(null);
-    setFormData({ name: '', price: '', originalPrice: '', image: '', unit: '', description: '', category: '' });
+    setFormData({ name: '', price: '', originalPrice: '', image: '', unit: '', description: '', category: '', subCategory: '', store: '' });
   };
 
   const handleEdit = (product: Product) => {
@@ -101,8 +107,10 @@ const AdminProductsPage = () => {
       originalPrice: product.originalPrice?.toString() || '',
       image: product.image,
       unit: product.unit,
-      description: '',
-      category: ''
+      description: product.description || '',
+      category: product.category || '',
+      subCategory: product.subCategory || '',
+      store: product.store || ''
     });
     setIsDialogOpen(true);
   };
@@ -118,7 +126,7 @@ const AdminProductsPage = () => {
 
   const openAddDialog = () => {
     setEditingProduct(null);
-    setFormData({ name: '', price: '', originalPrice: '', image: '', unit: '', description: '', category: '' });
+    setFormData({ name: '', price: '', originalPrice: '', image: '', unit: '', description: '', category: '', subCategory: '', store: '' });
     setIsDialogOpen(true);
   };
 
@@ -369,18 +377,45 @@ const AdminProductsPage = () => {
                       </div>
                     </div>
                     
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="category">الفئة الرئيسية</Label>
+                        <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر الفئة الرئيسية" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.filter(cat => cat.id !== 'all').map(category => (
+                              <SelectItem key={category.id} value={category.name}>
+                                {category.icon} {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="subCategory">الفئة الفرعية</Label>
+                        <Input
+                          id="subCategory"
+                          value={formData.subCategory}
+                          onChange={(e) => setFormData(prev => ({ ...prev, subCategory: e.target.value }))}
+                          placeholder="أدخل الفئة الفرعية"
+                        />
+                      </div>
+                    </div>
+                    
                     <div>
-                      <Label htmlFor="category">التصنيف</Label>
-                      <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                      <Label htmlFor="store">المتجر</Label>
+                      <Select value={formData.store} onValueChange={(value) => setFormData(prev => ({ ...prev, store: value }))}>
                         <SelectTrigger>
-                          <SelectValue placeholder="اختر التصنيف" />
+                          <SelectValue placeholder="اختر المتجر" />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.filter(cat => cat.id !== 'all').map(category => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.icon} {category.name}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="متجر الرياض">متجر الرياض</SelectItem>
+                          <SelectItem value="متجر جدة">متجر جدة</SelectItem>
+                          <SelectItem value="متجر الدمام">متجر الدمام</SelectItem>
+                          <SelectItem value="متجر مكة">متجر مكة</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -427,81 +462,87 @@ const AdminProductsPage = () => {
           </div>
 
           <Container size="full" className="p-6">
-            <div className="grid gap-6">
-              {filteredProducts.map((product) => (
-                <Card key={product.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-6">
-                      {/* Product Image */}
-                      <div className="w-16 h-16 bg-surface rounded-lg flex items-center justify-center text-2xl">
-                        {product.image}
-                      </div>
-                      
-                      {/* Product Info */}
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-bold text-lg">{product.name}</h3>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              <span>{product.rating}</span>
-                              <span>({product.reviewCount} تقييم)</span>
-                            </div>
+            <div className="bg-white rounded-lg border border-border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-surface border-b border-border">
+                    <tr>
+                      <th className="text-right p-4 font-medium">الصورة</th>
+                      <th className="text-right p-4 font-medium">اسم المنتج</th>
+                      <th className="text-right p-4 font-medium">الوصف</th>
+                      <th className="text-right p-4 font-medium">السعر</th>
+                      <th className="text-right p-4 font-medium">الفئة الرئيسية</th>
+                      <th className="text-right p-4 font-medium">الفئة الفرعية</th>
+                      <th className="text-right p-4 font-medium">المتجر</th>
+                      <th className="text-right p-4 font-medium">العمليات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProducts.map((product) => (
+                      <tr key={product.id} className="border-b border-border hover:bg-surface/50">
+                        <td className="p-4">
+                          <div className="w-12 h-12 bg-surface rounded-lg flex items-center justify-center text-xl">
+                            {product.image}
                           </div>
-                          
-                          <div className="text-left">
-                            <div className="flex items-center gap-2">
-                              <span className="text-2xl font-bold text-primary">
-                                {product.price} ر.س
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                / {product.unit}
-                              </span>
-                            </div>
-                            {product.originalPrice && (
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="line-through text-muted-foreground">
-                                  {product.originalPrice} ر.س
-                                </span>
-                                <Badge variant="destructive" className="text-xs">
-                                  -{product.discount}%
-                                </Badge>
-                              </div>
-                            )}
+                        </td>
+                        <td className="p-4">
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            <span>{product.rating}</span>
+                            <span>({product.reviewCount})</span>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mt-4">
-                          {product.isNew && (
-                            <Badge className="bg-success text-success-foreground">جديد</Badge>
+                        </td>
+                        <td className="p-4 max-w-xs">
+                          <div className="text-sm text-muted-foreground line-clamp-2">
+                            {product.description || 'لا يوجد وصف'}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-bold text-primary">{product.price} ر.س</div>
+                          <div className="text-sm text-muted-foreground">/ {product.unit}</div>
+                          {product.originalPrice && (
+                            <div className="text-xs text-muted-foreground line-through">
+                              {product.originalPrice} ر.س
+                            </div>
                           )}
-                          <Badge variant={product.inStock ? "default" : "destructive"}>
-                            {product.inStock ? 'متوفر' : 'غير متوفر'}
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline">
+                            {product.category || 'غير محدد'}
                           </Badge>
-                        </div>
-                      </div>
-                      
-                      {/* Actions */}
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(product)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(product.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="secondary">
+                            {product.subCategory || 'غير محدد'}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-sm">{product.store || 'غير محدد'}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(product)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(product.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {filteredProducts.length === 0 && (

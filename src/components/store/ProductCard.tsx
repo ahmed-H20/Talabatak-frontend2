@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 export interface Product {
   id: string;
   name: string;
+  description?: string;
   price: number;
   originalPrice?: number;
   image: string;
@@ -17,6 +18,9 @@ export interface Product {
   isNew?: boolean;
   isFavorite?: boolean;
   inStock: boolean;
+  category?: string;
+  subCategory?: string;
+  store?: string;
 }
 
 interface ProductCardProps {
