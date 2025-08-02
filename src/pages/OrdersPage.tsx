@@ -6,54 +6,108 @@ import { Container } from '@/components/layout/Container';
 import { Header } from '@/components/store/Header';
 import { BottomNav } from '@/components/store/BottomNav';
 import { OrderStatus } from '@/data/mockData';
+import { useEffect, useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
-interface Order {
-  id: string;
-  date: string;
-  status: OrderStatus;
-  items: Array<{ name: string; quantity: number; price: number }>;
-  total: number;
+// Interface for User location
+interface Location {
+  coordinates: [number, number];  // Array of latitude and longitude
+  type: "Point";  // Indicates the type of the location
 }
 
-const mockOrders: Order[] = [
-  {
-    id: '12345',
-    date: '2024-01-15',
-    status: 'delivered',
-    items: [
-      { name: 'تفاح أحمر طازج', quantity: 2, price: 12 },
-      { name: 'موز عضوي', quantity: 1, price: 8 }
-    ],
-    total: 32
-  },
-  {
-    id: '12346',
-    date: '2024-01-20',
-    status: 'processing',
-    items: [
-      { name: 'برتقال طبيعي', quantity: 3, price: 10 }
-    ],
-    total: 30
-  },
-  {
-    id: '12347',
-    date: '2024-01-18',
-    status: 'rejected',
-    items: [
-      { name: 'فراولة طازجة', quantity: 2, price: 18 }
-    ],
-    total: 36
-  }
-];
+// Interface for User
+interface User {
+  _id: string;  // User's unique identifier
+  name: string;  // User's name
+  location: Location;  // User's location
+  phone: string;
+}
+
+// Interface for Store location
+interface StoreLocation {
+  coordinates: {
+    lat: number;  // Latitude of the store
+    lng: number;  // Longitude of the store
+  };
+  address: string;  // Address of the store
+}
+
+// Interface for Store
+interface Store {
+  _id: string;  // Store's unique identifier
+  name: string;  // Store's name
+  location: StoreLocation;  // Store's location
+}
+
+interface Product {
+  name: string;
+  description: string;
+}
+
+// Interface for Order Item
+interface OrderItem {
+  product: Product;  // Product ID (Assumed to be a string)
+  quantity: number;  // Quantity of the product
+  price: number;  // Price per unit of the product
+}
+
+// Main Order Interface
+interface Order {
+  _id: string;  // Order's unique identifier
+  user: User;  // User who placed the order
+  store: Store;  // Store that fulfilled the order
+  orderItems: OrderItem[];  // List of items in the order
+  deliveryAddress: string;  // Delivery address
+  deliveryFee: number;  // Delivery fee
+  totalPrice: number;  // Total price of the order
+  groupOrderId: string;  // Group order ID
+  status: "processing" | "pending"  | "cancelled" | "delivered";  // Order status
+  createdAt: string;  // Order creation timestamp
+  updatedAt: string;  // Order update timestamp
+  __v: number;  // Version key (Mongoose internal)
+}
 
 const OrdersPage = () => {
-  const getStatusIcon = (status: OrderStatus) => {
+  const [orders, setOrders] = useState<Order[]>([]);  
+  const { toast } = useToast();
+  const token = localStorage.getItem("token")
+
+  // fetch orders 
+  useEffect(()=>{
+    const fetchOrders = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/orders', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        if (!res.ok) {
+          throw new Error('فشل في تحميل الطلبات');
+        }
+        const data = await res.json();
+        setOrders(data);
+      } catch (error) {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحميل الطلبات',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    fetchOrders()
+  },[token])
+
+  console.log(orders)
+
+  const getStatusIcon = (status) => {
     switch (status) {
       case 'delivered':
         return <CheckCircle className="h-4 w-4" />;
       case 'processing':
         return <Clock className="h-4 w-4" />;
-      case 'rejected':
+      case 'cancelled':
         return <XCircle className="h-4 w-4" />;
       default:
         return <Package className="h-4 w-4" />;
@@ -66,7 +120,7 @@ const OrdersPage = () => {
         return 'تم التسليم';
       case 'processing':
         return 'قيد المعالجة';
-      case 'rejected':
+      case 'cancelled':
         return 'مرفوض';
       default:
         return 'جديد';
@@ -79,7 +133,7 @@ const OrdersPage = () => {
         return 'bg-success text-success-foreground';
       case 'processing':
         return 'bg-warning text-warning-foreground';
-      case 'rejected':
+      case 'cancelled':
         return 'bg-destructive text-destructive-foreground';
       default:
         return 'bg-primary text-primary-foreground';
@@ -97,7 +151,7 @@ const OrdersPage = () => {
             <h1 className="text-2xl font-bold">طلباتي</h1>
           </div>
 
-          {mockOrders.length === 0 ? (
+          {orders.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
                 <div className="text-6xl mb-4">📦</div>
@@ -107,24 +161,25 @@ const OrdersPage = () => {
             </Card>
           ) : (
             <div className="space-y-4">
-              {mockOrders.map((order) => (
-                <Card key={order.id}>
+              {orders.map((order) => (
+                <Card key={order._id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">طلب رقم #{order.id}</CardTitle>
+                      <CardTitle className="text-lg">طلب رقم #{order._id}</CardTitle>
                       <Badge className={getStatusVariant(order.status)}>
                         {getStatusIcon(order.status)}
                         <span className="mr-1">{getStatusText(order.status)}</span>
                       </Badge>
                     </div>
-                    <p className="text-muted-foreground">{order.date}</p>
+                    <p className="text-muted-foreground">اليوم : { new Date(order.createdAt).toLocaleDateString()}</p>
+                    <p className="text-muted-foreground">الوقت : { new Date(order.createdAt).toLocaleTimeString()}</p>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {order.items.map((item, index) => (
+                      {order.orderItems.map((item, index) => (
                         <div key={index} className="flex justify-between items-center">
                           <div>
-                            <span className="font-medium">{item.name}</span>
+                            <span className="font-medium">{item.product.name}</span>
                             <span className="text-muted-foreground mr-2">x{item.quantity}</span>
                           </div>
                           <span className="font-semibold">{item.price * item.quantity} ر.س</span>
@@ -132,7 +187,7 @@ const OrdersPage = () => {
                       ))}
                       <div className="pt-3 border-t border-border flex justify-between items-center font-bold">
                         <span>المجموع الكلي</span>
-                        <span className="text-primary text-lg">{order.total} ر.س</span>
+                        <span className="text-primary text-lg">{order.totalPrice} ر.س</span>
                       </div>
                     </div>
                   </CardContent>
