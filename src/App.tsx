@@ -23,6 +23,7 @@ import VerifyPhonePage from "./pages/auth/VerifyPhonePage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
+import { LocationProvider } from "./contexts/LocationContext";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <LocationProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<StorePage />} />
@@ -67,6 +69,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </LocationProvider>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
