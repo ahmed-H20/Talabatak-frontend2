@@ -2,12 +2,19 @@ import { Home, ShoppingCart, Package, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 interface BottomNavProps {
   cartItemCount?: number;
 }
 
-export const BottomNav = ({ cartItemCount = 0 }: BottomNavProps) => {
+export const BottomNav = ({ cartItemCount}: BottomNavProps) => {
+  const [cartCount, setCartCount] = useState(0)
+
+  useEffect(()=>{
+    setCartCount(cartItemCount)
+  },[cartItemCount])
+  
   const navItems = [
     {
       to: '/',
@@ -19,7 +26,7 @@ export const BottomNav = ({ cartItemCount = 0 }: BottomNavProps) => {
       to: '/cart',
       icon: ShoppingCart,
       label: 'السلة',
-      badge: cartItemCount
+      badge: cartCount
     },
     {
       to: '/orders',

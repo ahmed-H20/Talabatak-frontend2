@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,99 +13,242 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Eye
+  Eye,
+  RefreshCw,
+  AlertCircle,
+  Bell
 } from 'lucide-react';
-import { BaseLayout } from '@/components/layout/BaseLayout';
-import { Container } from '@/components/layout/Container';
-import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { io, Socket } from 'socket.io-client';
 import { useToast } from '@/hooks/use-toast';
+import { BaseLayout } from '@/components/layout/BaseLayout';
+import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
-interface Order {
-  id: string;
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
-  items: Array<{ name: string; quantity: number; price: number }>;
-  total: number;
-  status: 'pending' | 'processing' | 'delivered' | 'rejected';
-  createdAt: string;
-  coordinates?: { lat: number; lng: number };
+interface OrderItem {
+  product: {
+    _id: string;
+    name: string;
+    images?: string[];
+  };
+  quantity: number;
+  price: number;
 }
 
-const mockOrders: Order[] = [
-  {
-    id: '12345',
-    customerName: 'أحمد محمد علي',
-    customerPhone: '0501234567',
-    customerAddress: 'الرياض، حي النخيل، شارع الملك فهد، بجوار مسجد النور',
-    items: [
-      { name: 'تفاح أحمر طازج', quantity: 2, price: 12 },
-      { name: 'موز عضوي', quantity: 1, price: 8 }
-    ],
-    total: 32,
-    status: 'pending',
-    createdAt: '2024-01-20 14:30',
-    coordinates: { lat: 24.7136, lng: 46.6753 }
-  },
-  {
-    id: '12346',
-    customerName: 'فاطمة أحمد حسن',
-    customerPhone: '0559876543',
-    customerAddress: 'جدة، حي الصفا، طريق الأمير سلطان',
-    items: [
-      { name: 'برتقال طبيعي', quantity: 3, price: 10 },
-      { name: 'جبن أبيض طبيعي', quantity: 1, price: 20 }
-    ],
-    total: 50,
-    status: 'processing',
-    createdAt: '2024-01-20 13:15'
-  },
-  {
-    id: '12347',
-    customerName: 'محمد علي خالد',
-    customerPhone: '0557894561',
-    customerAddress: 'الدمام، حي الشاطئ، شارع الخليج العربي',
-    items: [
-      { name: 'لحم غنم طازج', quantity: 1, price: 65 },
-      { name: 'خبز عربي طازج', quantity: 2, price: 3 }
-    ],
-    total: 71,
-    status: 'delivered',
-    createdAt: '2024-01-20 11:45'
-  }
-];
+interface Order {
+  _id: string;
+  user: {
+    _id: string;
+    name: string;
+    phone?: string;
+    location?: string | object;
+  } | null;
+  store: {
+    _id: string;
+    name: string;
+    location?: string | object;
+  } | null;
+  orderItems: OrderItem[];
+  deliveryAddress: string;
+  deliveryFee: number;
+  totalPrice: number;
+  status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+  groupOrderId?: string;
+}
 
 const AdminOrdersPage = () => {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const { toast } = useToast();
 
+  // Get auth token from localStorage or context
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  // Initialize Socket.IO connection
+  useEffect(() => {
+    const token = getAuthToken();
+    if (token) {
+      const socketInstance = io('http://localhost:5000', {
+        auth: {
+          token: token
+        }
+      });
+
+      setSocket(socketInstance);
+
+      // Listen for real-time order events
+      socketInstance.on('orderCreated', (newOrder: Order) => {
+        console.log('New order received:', newOrder);
+        setOrders(prev => [newOrder, ...prev]);
+        
+        toast({
+          title: '🔔 طلب جديد!',
+          description: `طلب جديد من ${newOrder.user?.name || 'مستخدم'} - ${newOrder.totalPrice.toFixed(2)} جنيه`,
+          duration: 5000,
+        });
+      });
+
+      socketInstance.on('orderStatusUpdated', (updatedOrder: Order) => {
+        console.log('Order status updated:', updatedOrder);
+        setOrders(prev => prev.map(order => 
+          order._id === updatedOrder._id ? updatedOrder : order
+        ));
+        
+        toast({
+          title: '✅ تم تحديث الطلب',
+          description: `تم تحديث حالة الطلب #${updatedOrder._id} إلى ${getStatusText(updatedOrder.status)}`,
+          duration: 3000,
+        });
+      });
+
+      socketInstance.on('orderUpdated', (updatedOrder: Order) => {
+        console.log('Order updated:', updatedOrder);
+        setOrders(prev => prev.map(order => 
+          order._id === updatedOrder._id ? updatedOrder : order
+        ));
+      });
+
+      socketInstance.on('orderCancelled', (cancelledOrder: Order) => {
+        console.log('Order cancelled:', cancelledOrder);
+        setOrders(prev => prev.map(order => 
+          order._id === cancelledOrder._id ? { ...order, status: 'cancelled' } : order
+        ));
+        
+        toast({
+          title: '❌ تم إلغاء الطلب',
+          description: `تم إلغاء الطلب #${cancelledOrder._id.slice(-8)}`,
+          duration: 3000,
+        });
+      });
+
+      socketInstance.on('connect', () => {
+        console.log('Connected to Socket.IO server');
+        toast({
+          title: '🔌 متصل',
+          description: 'تم الاتصال بالخادم - ستتلقى التحديثات فوراً',
+          duration: 2000,
+        });
+      });
+
+      socketInstance.on('disconnect', () => {
+        console.log('Disconnected from Socket.IO server');
+        toast({
+          title: '⚠️ انقطع الاتصال',
+          description: 'انقطع الاتصال بالخادم - جاري المحاولة للاتصال مرة أخرى',
+          variant: 'destructive',
+          duration: 3000,
+        });
+      });
+
+      return () => {
+        socketInstance.disconnect();
+      };
+    }
+  }, [toast]);
+
+  // Fetch all orders
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      const response = await fetch('http://localhost:5000/api/orders/all', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+
+      const data = await response.json();      
+      setOrders(data.data);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحميل الطلبات',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update order status
+  const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      setUpdatingStatus(orderId);
+      const token = getAuthToken();
+      
+      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update order status');
+      }
+
+      // Don't update local state here as Socket.IO will handle it
+      toast({
+        title: '✅ تم التحديث',
+        description: 'تم تحديث حالة الطلب بنجاح',
+      });
+      
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: 'خطأ',
+        description: 'فشل في تحديث حالة الطلب',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ar-SA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Filter orders with null safety checks
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.id.includes(searchTerm);
+    const userName = order.user?.name || '';
+    const storeName = order.store?.name || '';
+    
+    const matchesSearch = userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         order._id.includes(searchTerm) ||
+                         storeName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
-
-  const updateOrderStatus = (orderId: string, newStatus: Order['status']) => {
-    setOrders(prev => prev.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ));
-    
-    toast({
-      title: "تم تحديث حالة الطلب",
-      description: `تم تغيير حالة الطلب #${orderId}`,
-      className: "bg-success text-success-foreground"
-    });
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'processing': return <ShoppingCart className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled': 
       case 'rejected': return <XCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
@@ -116,6 +259,7 @@ const AdminOrdersPage = () => {
       case 'pending': return 'بانتظار المراجعة';
       case 'processing': return 'قيد المعالجة';
       case 'delivered': return 'تم التسليم';
+      case 'cancelled': return 'ملغي';
       case 'rejected': return 'مرفوض';
       default: return 'غير معروف';
     }
@@ -123,33 +267,73 @@ const AdminOrdersPage = () => {
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-warning text-warning-foreground';
-      case 'processing': return 'bg-info text-info-foreground';
-      case 'delivered': return 'bg-success text-success-foreground';
-      case 'rejected': return 'bg-destructive text-destructive-foreground';
-      default: return 'bg-muted text-muted-foreground';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'processing': return 'bg-blue-100 text-blue-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'cancelled': 
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
+  // Load orders on component mount
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50" dir="rtl">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">جاري تحميل الطلبات...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <BaseLayout dir="rtl" className="bg-surface">
-      <div className="flex h-screen">
+      <div className="flex min-h-screen">
+        {/* Add AdminSidebar component here if you have it */}
         <AdminSidebar />
         
+        {/* Main Content */}
         <main className="flex-1 overflow-auto">
           {/* Header */}
-          <div className="bg-white border-b border-border p-4">
-            <div className="flex items-center gap-3 mb-4">
-              <ShoppingCart className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold">إدارة الطلبات</h1>
+          <div className="bg-white border-b border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <ShoppingCart className="h-6 w-6 text-blue-600" />
+                <h1 className="text-2xl font-bold text-gray-900">إدارة الطلبات</h1>
+                <Badge variant="secondary">{filteredOrders.length} طلب</Badge>
+                {socket?.connected && (
+                  <Badge className="bg-green-100 text-green-800">
+                    <Bell className="h-3 w-3 mr-1" />
+                    متصل
+                  </Badge>
+                )}
+              </div>
+              
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={fetchOrders}
+                  disabled={loading}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  تحديث
+                </Button>
+              </div>
             </div>
             
-            {/* Filters */}
-            <div className="flex gap-4 items-center">
+            {/* Search and Filter */}
+            <div className="flex gap-4">
               <div className="relative flex-1 max-w-md">
-                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="البحث بالاسم أو رقم الطلب..."
+                  placeholder="البحث بالاسم أو رقم الطلب أو المتجر..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pr-10"
@@ -166,134 +350,244 @@ const AdminOrdersPage = () => {
                   <SelectItem value="pending">بانتظار المراجعة</SelectItem>
                   <SelectItem value="processing">قيد المعالجة</SelectItem>
                   <SelectItem value="delivered">تم التسليم</SelectItem>
+                  <SelectItem value="cancelled">ملغي</SelectItem>
                   <SelectItem value="rejected">مرفوض</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <Container size="full" className="p-6">
-            <div className="grid gap-6">
-              {filteredOrders.map((order) => (
-                <Card key={order.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">طلب رقم #{order.id}</CardTitle>
-                        <p className="text-sm text-muted-foreground">{order.createdAt}</p>
-                      </div>
-                      <Badge className={getStatusVariant(order.status)}>
-                        {getStatusIcon(order.status)}
-                        <span className="mr-1">{getStatusText(order.status)}</span>
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {/* Customer Info */}
-                      <div>
-                        <h4 className="font-medium mb-3">معلومات العميل</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">الاسم:</span>
-                            <span>{order.customerName}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span>{order.customerPhone}</span>
-                          </div>
-                          <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                            <span>{order.customerAddress}</span>
-                          </div>
-                          {order.coordinates && (
-                            <Button variant="outline" size="sm" className="mt-2">
-                              <MapPin className="h-4 w-4 ml-2" />
-                              عرض على الخريطة
-                            </Button>
-                          )}
+          {/* Orders Content */}
+          <div className="p-6">
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="space-y-4 p-4">
+                {filteredOrders.map((order) => (
+                  <Card key={order._id} className="shadow-sm">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">طلب رقم #{order._id.slice(-8)}</CardTitle>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {formatDate(order.createdAt)} • متجر: {order.store?.name || 'متجر محذوف'}
+                          </p>
                         </div>
+                        <Badge className={getStatusVariant(order.status)}>
+                          {getStatusIcon(order.status)}
+                          <span className="mr-1">{getStatusText(order.status)}</span>
+                        </Badge>
                       </div>
-
-                      {/* Order Items */}
-                      <div>
-                        <h4 className="font-medium mb-3">المنتجات</h4>
-                        <div className="space-y-2">
-                          {order.items.map((item, index) => (
-                            <div key={index} className="flex justify-between items-center text-sm">
-                              <div>
-                                <span className="font-medium">{item.name}</span>
-                                <span className="text-muted-foreground mr-2">x{item.quantity}</span>
-                              </div>
-                              <span className="font-semibold">{item.price * item.quantity} ر.س</span>
+                    </CardHeader>
+                    
+                    <CardContent>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {/* Customer Info */}
+                        <div>
+                          <h4 className="font-medium mb-3 text-gray-900">معلومات العميل</h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-700">الاسم:</span>
+                              <span>{order.user?.name || 'مستخدم محذوف'}</span>
                             </div>
-                          ))}
-                          <div className="pt-2 border-t border-border flex justify-between items-center font-bold">
-                            <span>المجموع الكلي</span>
-                            <span className="text-primary text-lg">{order.total} ر.س</span>
+                            {order.user?.phone && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-4 w-4 text-gray-400" />
+                                <span>{order.user.phone}</span>
+                              </div>
+                            )}
+                            <div className="flex items-start gap-2">
+                              <MapPin className="h-4 w-4 text-gray-400 mt-1" />
+                              <span>{order.deliveryAddress}</span>
+                            </div>
+                            {order.user?.location && (
+                              <div className="flex items-center gap-2 text-gray-500">
+                                <span className="text-xs">الموقع المسجل:</span>
+                                <span className="text-xs">
+                                  {typeof order.user.location === 'string' 
+                                    ? order.user.location 
+                                    : 'موقع محدد'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Order Items */}
+                        <div>
+                          <h4 className="font-medium mb-3 text-gray-900">المنتجات</h4>
+                          <div className="space-y-2">
+                            {order.orderItems.map((item, index) => (
+                              <div key={index} className="flex justify-between items-center text-sm">
+                                <div>
+                                  <span className="font-medium">{item.product?.name || 'منتج محذوف'}</span>
+                                  <span className="text-gray-500 mr-2">x{item.quantity}</span>
+                                </div>
+                                <span className="font-semibold">{(item.price * item.quantity).toFixed(2)} جنيه</span>
+                              </div>
+                            ))}
+                            
+                            <div className="pt-2 space-y-1 border-t">
+                              <div className="flex justify-between text-sm">
+                                <span>رسوم التوصيل</span>
+                                <span>{order.deliveryFee.toFixed(2)} جنيه</span>
+                              </div>
+                              <div className="flex justify-between items-center font-bold text-lg">
+                                <span>المجموع الكلي</span>
+                                <span className="text-blue-600">{order.totalPrice.toFixed(2)} جنيه</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-2 mt-6 pt-4 border-t border-border">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedOrder(order)}
-                      >
-                        <Eye className="h-4 w-4 ml-2" />
-                        عرض التفاصيل
-                      </Button>
-                      
-                      {order.status === 'pending' && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => updateOrderStatus(order.id, 'processing')}
-                            className="bg-info text-info-foreground hover:bg-info/90"
-                          >
-                            قبول الطلب
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => updateOrderStatus(order.id, 'rejected')}
-                          >
-                            رفض الطلب
-                          </Button>
-                        </>
-                      )}
-                      
-                      {order.status === 'processing' && (
+                      {/* Actions */}
+                      <div className="flex gap-2 mt-6 pt-4 border-t">
                         <Button
+                          variant="outline"
                           size="sm"
-                          onClick={() => updateOrderStatus(order.id, 'delivered')}
-                          className="bg-success text-success-foreground hover:bg-success/90"
+                          onClick={() => setSelectedOrder(order)}
                         >
-                          تم التسليم
+                          <Eye className="h-4 w-4 ml-2" />
+                          عرض التفاصيل
                         </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        
+                        {order.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => updateOrderStatus(order._id, 'processing')}
+                              disabled={updatingStatus === order._id}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              {updatingStatus === order._id ? (
+                                <RefreshCw className="h-4 w-4 ml-2 animate-spin" />
+                              ) : null}
+                              قبول الطلب
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => updateOrderStatus(order._id, 'rejected')}
+                              disabled={updatingStatus === order._id}
+                            >
+                              رفض الطلب
+                            </Button>
+                          </>
+                        )}
+                        
+                        {order.status === 'processing' && (
+                          <Button
+                            size="sm"
+                            onClick={() => updateOrderStatus(order._id, 'delivered')}
+                            disabled={updatingStatus === order._id}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            {updatingStatus === order._id ? (
+                              <RefreshCw className="h-4 w-4 ml-2 animate-spin" />
+                            ) : null}
+                            تم التسليم
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
 
-            {filteredOrders.length === 0 && (
-              <Card className="text-center py-12">
+            {filteredOrders.length === 0 && !loading && (
+              <Card className="text-center py-12 mt-6">
                 <CardContent>
-                  <ShoppingCart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">لا توجد طلبات</h3>
-                  <p className="text-muted-foreground">لم يتم العثور على طلبات تطابق معايير البحث</p>
+                  {orders.length === 0 ? (
+                    <>
+                      <ShoppingCart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">لا توجد طلبات</h3>
+                      <p className="text-gray-500">لم يتم استلام أي طلبات بعد</p>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">لا توجد نتائج</h3>
+                      <p className="text-gray-500">لم يتم العثور على طلبات تطابق معايير البحث</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
-          </Container>
-        </main>
+          </div>
+        </main>        
       </div>
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>تفاصيل الطلب #{selectedOrder._id.slice(-8)}</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedOrder(null)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-semibold mb-2">معلومات الطلب</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">تاريخ الإنشاء:</span>
+                      <p>{formatDate(selectedOrder.createdAt)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">آخر تحديث:</span>
+                      <p>{formatDate(selectedOrder.updatedAt)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">المتجر:</span>
+                      <p>{selectedOrder.store?.name || 'متجر محذوف'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">الحالة:</span>
+                      <p>{getStatusText(selectedOrder.status)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">المنتجات المطلوبة</h4>
+                  <div className="space-y-3">
+                    {selectedOrder.orderItems.map((item, index) => (
+                      <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                        <div>
+                          <p className="font-medium">{item.product?.name || 'منتج محذوف'}</p>
+                          <p className="text-sm text-gray-500">الكمية: {item.quantity}</p>
+                          <p className="text-sm text-gray-500">السعر الوحدة: {item.price.toFixed(2)} جنيه</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{(item.price * item.quantity).toFixed(2)} جنيه</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">المجموع النهائي (شامل التوصيل):</span>
+                    <span className="font-bold text-lg text-blue-600">
+                      {selectedOrder.totalPrice.toFixed(2)} جنيه
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </BaseLayout>
   );
 };

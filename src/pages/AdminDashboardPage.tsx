@@ -15,142 +15,270 @@ import {
   LogOut
 } from 'lucide-react';
 import { BaseLayout } from '@/components/layout/BaseLayout';
-import { Container } from '@/components/layout/Container';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
 
-interface DashboardStats {
-  totalOrders: number;
-  pendingOrders: number;
-  totalProducts: number;
-  totalRevenue: number;
-}
+// API Configuration
+const API_BASE_URL = 'http://localhost:5000/api';
 
-interface RecentOrder {
-  id: string;
-  customerName: string;
-  total: number;
-  status: 'pending' | 'processing' | 'delivered' | 'rejected';
-  createdAt: string;
-  location: string;
-}
+// API Service Functions
+const apiService = {
+  // Orders
+  async getOrders() {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/orders/all`, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch orders');
+    }
+    
+    return response.json();
+  },
+
+  async updateOrderStatus(orderId, status) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+      method: 'PATCH',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ status })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update order status');
+    }
+    
+    return response.json();
+  },
+
+  // Products
+  async getProducts() {
+    const response = await fetch(`${API_BASE_URL}/products`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch products');
+    }
+    
+    return response.json();
+  },
+
+  // Categories
+  async getCategories() {
+    const response = await fetch(`${API_BASE_URL}/categories`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch categories');
+    }
+    
+    return response.json();
+  },
+
+  // Stores
+  async getStores() {
+    const response = await fetch(`${API_BASE_URL}/stores`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch stores');
+    }
+    
+    return response.json();
+  }
+};
 
 const AdminDashboardPage = () => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalOrders: 127,
-    pendingOrders: 8,
-    totalProducts: 45,
-    totalRevenue: 12450
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    pendingOrders: 0,
+    totalProducts: 0,
+    totalRevenue: 0
   });
   
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([
-    {
-      id: '12345',
-      customerName: 'أحمد محمد',
-      total: 125,
-      status: 'pending',
-      createdAt: '2024-01-20 14:30',
-      location: 'الرياض، حي النخيل'
-    },
-    {
-      id: '12346',
-      customerName: 'فاطمة أحمد',
-      total: 89,
-      status: 'processing',
-      createdAt: '2024-01-20 13:15',
-      location: 'جدة، حي الصفا'
-    },
-    {
-      id: '12347',
-      customerName: 'محمد علي',
-      total: 156,
-      status: 'delivered',
-      createdAt: '2024-01-20 11:45',
-      location: 'الدمام، حي الشاطئ'
-    }
-  ]);
-
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Check admin authentication
-    const adminToken = localStorage.getItem('adminToken');
-    if (!adminToken) {
-      navigate('/admin/login');
-    }
-
-    // Simulate real-time updates
+    loadDashboardData();
+    
+    // Set up polling for real-time updates
     const interval = setInterval(() => {
-      // Mock new order notification
-      if (Math.random() > 0.95) {
-        const newOrder: RecentOrder = {
-          id: `${Date.now()}`,
-          customerName: 'عميل جديد',
-          total: Math.floor(Math.random() * 200) + 50,
-          status: 'pending',
-          createdAt: new Date().toLocaleString('ar-SA'),
-          location: 'موقع جديد'
-        };
-        
-        setRecentOrders(prev => [newOrder, ...prev.slice(0, 4)]);
-        setStats(prev => ({ ...prev, totalOrders: prev.totalOrders + 1, pendingOrders: prev.pendingOrders + 1 }));
-        
-        toast({
-          title: "طلب جديد!",
-          description: `طلب من ${newOrder.customerName} بقيمة ${newOrder.total} ر.س`,
-          className: "bg-primary text-primary-foreground"
-        });
-      }
-    }, 10000);
+      loadDashboardData();
+    }, 30000); // Poll every 30 seconds
 
     return () => clearInterval(interval);
-  }, [navigate, toast]);
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    navigate('/admin/login');
-    toast({
-      title: "تم تسجيل الخروج",
-      description: "تم تسجيل خروجك بنجاح",
-    });
+  const loadDashboardData = async () => {
+    try {
+      setError(null);
+      
+      // Check admin authentication
+      const adminToken = localStorage.getItem('token');
+      if (!adminToken) {
+        window.location.href = '/admin/login';
+        return;
+      }
+
+      // Load data from APIs
+      const [ordersRes, productsRes, storesRes, categoriesRes] = await Promise.all([
+        apiService.getOrders().catch(err => ({ error: err.message, data: [] })),
+        apiService.getProducts().catch(err => ({ error: err.message, data: [] })),
+        apiService.getStores().catch(err => ({ error: err.message, data: [] })),
+        apiService.getCategories().catch(err => ({ error: err.message, data: [] }))
+      ]);
+
+      // Process Orders Data
+      let ordersList = [];
+      if (ordersRes && !ordersRes.error) {
+        ordersList = Array.isArray(ordersRes) ? ordersRes : (ordersRes.data || []);
+        setRecentOrders(ordersList.slice(0, 5)); // Get recent 5 orders
+        
+        // Calculate order statistics
+        const pendingCount = ordersList.filter(order => order.status === 'pending').length;
+        const totalRevenue = ordersList
+          .filter(order => order.status === 'delivered')
+          .reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+
+        setStats(prev => ({
+          ...prev,
+          totalOrders: ordersList.length,
+          pendingOrders: pendingCount,
+          totalRevenue: totalRevenue
+        }));
+      }
+
+      // Process Products Data
+      if (productsRes && !productsRes.error) {
+        const productsList = Array.isArray(productsRes) ? productsRes : (productsRes.data || []);
+        setStats(prev => ({
+          ...prev,
+          totalProducts: productsList.length
+        }));
+      }
+
+      setLoading(false);
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      setError('خطأ في تحميل البيانات من الخادم');
+      setLoading(false);
+    }
   };
 
-  const getStatusIcon = (status: string) => {
+  const handleOrderStatusUpdate = async (orderId, newStatus) => {
+    try {
+      await apiService.updateOrderStatus(orderId, newStatus);
+      
+      // Update the order in the local state
+      setRecentOrders(prevOrders => 
+        prevOrders.map(order => 
+          order._id === orderId 
+            ? { ...order, status: newStatus }
+            : order
+        )
+      );
+
+      // Reload data to update stats
+      loadDashboardData();
+      
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      setError('خطأ في تحديث حالة الطلب');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/admin/login';
+  };
+
+  const getStatusIcon = (status) => {
     switch (status) {
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'processing': return <Package className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'rejected': return <XCircle className="h-4 w-4" />;
+      case 'cancelled': return <XCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status) => {
     switch (status) {
       case 'pending': return 'بانتظار المراجعة';
       case 'processing': return 'قيد المعالجة';
       case 'delivered': return 'تم التسليم';
-      case 'rejected': return 'مرفوض';
+      case 'cancelled': return 'مرفوض';
       default: return 'غير معروف';
     }
   };
 
-  const getStatusVariant = (status: string) => {
+  const getStatusVariant = (status) => {
     switch (status) {
       case 'pending': return 'bg-warning text-warning-foreground';
       case 'processing': return 'bg-info text-info-foreground';
       case 'delivered': return 'bg-success text-success-foreground';
-      case 'rejected': return 'bg-destructive text-destructive-foreground';
+      case 'cancelled': return 'bg-destructive text-destructive-foreground';
       default: return 'bg-muted text-muted-foreground';
     }
   };
 
+  const formatDate = (dateString) => {
+    try {
+      return new Date(dateString).toLocaleString('ar-SA', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'تاريخ غير صحيح';
+    }
+  };
+
+  const formatCustomerName = (order) => {
+    // If user data is populated, use user name
+    if (order.user && order.user.name) {
+      return order.user.name;
+    }
+    
+    // Otherwise, create a generic name with order ID
+    return `عميل #${order._id?.slice(-6) || 'غير معروف'}`;
+  };
+
+  const formatLocation = (order) => {
+    if (order.deliveryAddress) {
+      return order.deliveryAddress;
+    }
+    
+    if (order.user && order.user.location && order.user.location.coordinates) {
+      return `${order.user.location.coordinates[1]?.toFixed(4)}, ${order.user.location.coordinates[0]?.toFixed(4)}`;
+    }
+    
+    return 'عنوان غير محدد';
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center" dir="rtl">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">جاري تحميل البيانات...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <BaseLayout dir="rtl" className="bg-surface">
       <div className="flex h-screen">
-        <AdminSidebar />
+                  <AdminSidebar />       
         
         <main className="flex-1 overflow-auto">
           {/* Header */}
@@ -160,9 +288,9 @@ const AdminDashboardPage = () => {
               <p className="text-muted-foreground">مرحباً بك في لوحة تحكم المتجر</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={loadDashboardData}>
                 <Bell className="h-4 w-4 ml-2" />
-                الإشعارات
+                تحديث
               </Button>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 ml-2" />
@@ -171,7 +299,13 @@ const AdminDashboardPage = () => {
             </div>
           </div>
 
-          <Container size="full" className="p-6">
+          <div className="p-6">
+            {error && (
+              <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
+                {error}
+              </div>
+            )}
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <Card>
@@ -241,44 +375,77 @@ const AdminDashboardPage = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-surface rounded-full flex items-center justify-center">
-                          <Users className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{order.customerName}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span>{order.location}</span>
+                  {recentOrders.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      لا توجد طلبات حالياً
+                    </div>
+                  ) : (
+                    recentOrders.map((order) => (
+                      <div key={order._id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-surface rounded-full flex items-center justify-center">
+                            <Users className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{formatCustomerName(order)}</p>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span>{formatLocation(order)}</span>
+                            </div>
                           </div>
                         </div>
+                        
+                        <div className="text-center">
+                          <p className="font-bold text-lg">{order.totalPrice || 0} ر.س</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(order.createdAt)}</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <Badge className={getStatusVariant(order.status)}>
+                            {getStatusIcon(order.status)}
+                            <span className="mr-1">{getStatusText(order.status)}</span>
+                          </Badge>
+                          
+                          {order.status === 'pending' && (
+                            <div className="flex gap-1">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleOrderStatusUpdate(order._id, 'processing')}
+                              >
+                                قبول
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => handleOrderStatusUpdate(order._id, 'cancelled')}
+                              >
+                                رفض
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {order.status === 'processing' && (
+                            <Button 
+                              size="sm" 
+                              variant="default"
+                              onClick={() => handleOrderStatusUpdate(order._id, 'delivered')}
+                            >
+                              تم التسليم
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      
-                      <div className="text-center">
-                        <p className="font-bold text-lg">{order.total} ر.س</p>
-                        <p className="text-xs text-muted-foreground">{order.createdAt}</p>
-                      </div>
-                      
-                      <div className="flex items-center gap-3">
-                        <Badge className={getStatusVariant(order.status)}>
-                          {getStatusIcon(order.status)}
-                          <span className="mr-1">{getStatusText(order.status)}</span>
-                        </Badge>
-                        <Button variant="outline" size="sm">
-                          عرض التفاصيل
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
-          </Container>
+          </div>
         </main>
       </div>
-    </BaseLayout>
+        </BaseLayout >
+    
   );
 };
 

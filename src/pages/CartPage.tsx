@@ -4,46 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import { BaseLayout } from '@/components/layout/BaseLayout';
 import { Container } from '@/components/layout/Container';
 import { Header } from '@/components/store/Header';
 import { BottomNav } from '@/components/store/BottomNav';
-import { mockCartItems } from '@/data/mockData';
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import io from 'socket.io-client';
 
 const CartPage = () => {
-  const [cartItems, setCartItems] = useState<cart>(
-  //   {
-  //     status: "success",
-  //     numOfCartItems: 1,
-  //     data: {
-  //         id:'',
-  //         cartItems: [
-  //             {
-  //                 product: {
-  //                     id: "",
-  //                     name: "Example Product",
-  //                     images:[
-  //                       {
-  //                         url:''
-  //                       }
-  //                     ],
-  //                     unit:''
-  //                 },
-  //                 quantity: 0,
-  //                 price: 0
-  //             }
-  //         ],
-  //         totalCartPrice: 40000,
-  //         totalPriceAfterDiscount: 0,
-  //         user: {
-  //             id: "",
-  //             name: " user",
-  //         },
-  //     }
-  // }
-  );
+  const [cartItems, setCartItems] = useState<cart>();
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [socket, setSocket] = useState(null);
 
   const { toast } = useToast();
   const token = localStorage.getItem('token')
@@ -61,11 +35,7 @@ const CartPage = () => {
         product: {
           id: string;
           name: string;
-          images:[
-            {
-              url:string
-            }
-          ]
+          images:['']
           unit:string;
         };
         quantity: number;
@@ -80,19 +50,151 @@ const CartPage = () => {
     };
   }
 
+  // Initialize Socket.IO connection
+  useEffect(() => {
+    if (user && token) {
+      const socketConnection = io('http://localhost:5000', {
+        auth: {
+          token: token
+        }
+      });
+
+      socketConnection.on('connect', () => {
+        console.log('Connected to socket server');
+      });
+
+      socketConnection.on('orderCreated', (data) => {
+        console.log('Order created:', data);
+        toast({
+          title: "تم إنشاء الطلب بنجاح",
+          description: `طلب رقم: ${data.orderId}`,
+        });
+      });
+
+      socketConnection.on('orderStatusUpdated', (data) => {
+        console.log('Order status updated:', data);
+        toast({
+          title: "تم تحديث حالة الطلب",
+          description: `الحالة الجديدة: ${data.newStatus}`,
+        });
+      });
+
+      setSocket(socketConnection);
+
+      return () => {
+        socketConnection.disconnect();
+      };
+    }
+  }, []); // Empty dependency array since we only want this to run once
+
+  // Create Order Function
+  // In your CartPage component, modify the createOrder function:
+
+const createOrder = async () => {
+  if (!deliveryAddress.trim()) {
+    toast({
+      title: "خطأ",
+      description: "يرجى إدخال عنوان التوصيل",
+      variant: "destructive"
+    });
+    return;
+  }
+
+  if (!cartItems?.data.cartItems || cartItems.data.cartItems.length === 0) {
+    toast({
+      title: "خطأ", 
+      description: "السلة فارغة",
+      variant: "destructive"
+    });
+    return;
+  }
+
+  try {
+    setIsCreatingOrder(true);
+
+    // Prepare order items in the format expected by backend
+    const orderItems = cartItems.data.cartItems.map(item => ({
+      product: item.product.id,
+      quantity: item.quantity
+    }));
+
+    const orderData = {
+      orderItems,
+      deliveryAddress: deliveryAddress.trim(),
+      // 🔥 ADD THESE LINES:
+      appliedCoupon: couponCode || null,
+      originalTotal: totalPrice,
+      discountedTotal: afterDiscount || totalPrice,
+      discountAmount: afterDiscount ? (totalPrice - afterDiscount) : 0
+    };
+
+    console.log('Creating order with data:', orderData);
+
+    const response = await fetch('http://localhost:5000/api/orders/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'فشل في إنشاء الطلب');
+    }
+
+    console.log('Order created successfully:', data);
+
+    toast({
+      title: "تم إنشاء الطلب بنجاح",
+      description: `تم إنشاء ${data.totalOrders} طلب/طلبات`,
+    });
+
+    // Clear the cart and delivery address
+    setCartItems(null);
+    setDeliveryAddress("");
+    setAfterDiscount(null);
+    setCouponCode("");
+
+  } catch (error) {
+    console.error('Error creating order:', error);
+    toast({
+      title: "خطأ",
+      description: error.message || "حدث خطأ أثناء إنشاء الطلب",
+      variant: "destructive"
+    });
+  } finally {
+    setIsCreatingOrder(false);
+  }
+};
+
   const handleApplyCoupon = async () => {
+    console.log(couponCode)
     if (!couponCode) return toast({title: "أدخل رمز الخصم", variant: 'destructive'});
 
     try {
       setIsApplying(true);
-      const res = await fetch(`http://localhost:5000/api/v1/cart/applyCoupon`, {
-        method: 'PUT',
+      const res = await fetch(`http://localhost:5000/api/coupons/useCoupon`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
         },
-      });
-      fetchCart()
+        body: JSON.stringify({"couponName" : couponCode})
+      });       
+      const data = await res.json()
+      if(!res.ok){
+        toast({title: data.message});
+        console.log(res)
+        return   
+      }
+      console.log(data.message)            
+      // Update cart data directly instead of refetching
+      if (data.totalPriceAfterDiscount) {
+        setAfterDiscount(data.totalPriceAfterDiscount);
+      }
       toast({title: "تم تطبيق الخصم بنجاح"});      
     } catch (error) {
       toast({title : error.response?.data || "حدث خطأ أثناء تطبيق الكوبون"});
@@ -132,23 +234,23 @@ const CartPage = () => {
   console.log(cartItems,user)
 
   const updateQuantity = async (id: string, newQuantity: number) => {
-  // ✅ Optimistically update the UI
-  setCartItems(prev => {
-    const updatedItems = newQuantity <= 0
-      ? prev.data.cartItems.filter(item => item.product.id !== id)
-      : prev.data.cartItems.map(item =>
-          item.product.id === id
-            ? { ...item, quantity: newQuantity }
-            : item
-        );
+    // ✅ Optimistically update the UI
+    setCartItems(prev => {
+      const updatedItems = newQuantity <= 0
+        ? prev.data.cartItems.filter(item => item.product.id !== id)
+        : prev.data.cartItems.map(item =>
+            item.product.id === id
+              ? { ...item, quantity: newQuantity }
+              : item
+          );
 
-    return {
-      ...prev,
-      data: {
-        ...prev.data,
-        cartItems: updatedItems,
-      },
-    };
+      return {
+        ...prev,
+        data: {
+          ...prev.data,
+          cartItems: updatedItems,
+        },
+      };
   });
 
   try {
@@ -167,17 +269,43 @@ const CartPage = () => {
     }    
     const data = await res.json();
     console.log("تم تحديث العربة:", data);
-    fetchCart()
-  } catch (err) {
-    console.error("خطأ أثناء تحديث الكمية:", err);
-    // ✅ Optional: revert state if error occurs
-    // You can show a toast and optionally reload the cart
-  }
-};
+    // Only fetch cart if the update was successful
+    await fetchCart();
+    } catch (err) {
+      console.error("خطأ أثناء تحديث الكمية:", err);
+      // Revert the optimistic update
+      fetchCart();
+    }
+  };
 
+  const deleteProduct = async (id: string) => {
+    try {
+    // ✅ Call API to delete in backend
+    const res = await fetch(`http://localhost:5000/api/cart/deletecart/${id}`, {
+      method:  "DELETE",
+      headers: { 
+        "Content-Type": "application/json" ,
+        ...(token && { Authorization: `Bearer ${token}` }),
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error("فشل حذف المنتج من قاعدة البيانات");
+    }    
+    console.log("تم حذف المنتج بنجاح");
+    await fetchCart();
+    } catch (err) {
+      console.error("خطأ أثناء حذف المنتج:", err);
+      // Show error message to user
+      toast({
+        title: 'خطأ',
+        description: 'فشل في حذف المنتج',
+        variant: 'destructive',
+      });
+    }
+  }
 
   const totalPrice = cartItems?.data.totalCartPrice || 0
-
   const totalItems = cartItems?.numOfCartItems || 0
 
   console.log(cartItems)
@@ -213,7 +341,7 @@ const CartPage = () => {
                         <div className="w-20 h-20 bg-surface rounded-lg flex items-center justify-center text-3xl">
                           {
                             item.product?.images ?
-                            <img src={item.product.images[0].url} alt="product image" />
+                            <img src={item.product.images[0]} alt="product image" />
                             :
                             '🎯'
                           }
@@ -246,7 +374,7 @@ const CartPage = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => updateQuantity(item.product.id, 0)}
+                              onClick={() => deleteProduct(item.id)}
                               className="text-destructive hover:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -266,44 +394,25 @@ const CartPage = () => {
 
               {/* Order Summary & Customer Info */}
               <div className="space-y-6">
-                {/* <Card>
+                {/* Delivery Address */}
+                <Card>
                   <CardHeader>
-                    <CardTitle>معلومات العميل</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      عنوان التوصيل
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">الاسم الكامل</Label>
-                      <Input
-                        id="name"
-                        value={customerInfo.name}
-                        onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="أدخل اسمك الكامل"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="phone">رقم الهاتف</Label>
-                      <Input
-                        id="phone"
-                        value={customerInfo.phone}
-                        onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
-                        placeholder="05xxxxxxxx"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="address">العنوان</Label>
-                      <Input
-                        id="address"
-                        value={customerInfo.address}
-                        onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
-                        placeholder="أدخل عنوانك"
-                      />
-                    </div>
-                    <Button variant="outline" className="w-full">
-                      <MapPin className="ml-2 h-4 w-4" />
-                      تحديد الموقع على الخريطة
-                    </Button>
+                  <CardContent>
+                    <Textarea
+                      placeholder="أدخل عنوان التوصيل التفصيلي..."
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      rows={3}
+                      className="resize-none"
+                    />
                   </CardContent>
-                </Card> */}
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle>ملخص الطلب</CardTitle>
@@ -315,7 +424,7 @@ const CartPage = () => {
                     </div>
                     <div className="flex justify-between">
                       <span>رسوم التوصيل</span>
-                      <span className="text-success">مجاناً</span>
+                      <span className="text-success">30</span>
                     </div>
 
                     {/* Input coupon */}
@@ -340,8 +449,13 @@ const CartPage = () => {
                       </span>
                     </div>
 
-                    <Button className="w-full" size="lg">
-                      تأكيد الطلب
+                    <Button 
+                      className="w-full" 
+                      size="lg"
+                      onClick={createOrder}
+                      disabled={isCreatingOrder || !deliveryAddress.trim()}
+                    >
+                      {isCreatingOrder ? "جاري إنشاء الطلب..." : "تأكيد الطلب"}
                     </Button>
                   </CardContent>
                 </Card>

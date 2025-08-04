@@ -24,6 +24,7 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 import { LocationProvider } from "./contexts/LocationContext";
+import AdminCouponsPage from "./pages/AdminCouponPage";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/admin/categories" element={<AdminCategoriesPage />} />
             <Route path="/admin/stores" element={<AdminStoresPage />} />
             <Route path="/admin/locations" element={<AdminLocationsPage />} />
+            <Route path="/admin/coupons" element={<AdminCouponsPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

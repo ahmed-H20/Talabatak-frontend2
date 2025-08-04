@@ -39,9 +39,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       } catch (error) {
         // Token is invalid, clear local storage
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setUser(null);
+        // localStorage.removeItem('token');
+        // localStorage.removeItem('user');
+        // setUser(null);
       } finally {
         setLoading(false);
       }

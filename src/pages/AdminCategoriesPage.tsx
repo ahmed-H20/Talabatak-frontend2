@@ -1,228 +1,311 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BaseLayout } from '@/components/layout/BaseLayout';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import EmojiPicker from 'emoji-picker-react';
 
 interface Category {
-  id: string;
+  _id: string;
   name: string;
-  description: string;
-  productsCount: number;
-  isActive: boolean;
+  subCategories: [
+    {
+      _id: string;
+      name: string;
+    }  
+  ];
+  image: string;
 }
 
 const AdminCategoriesPage = () => {
   const { toast } = useToast();
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'الهواتف المحمولة', description: 'جميع أنواع الهواتف الذكية', productsCount: 15, isActive: true },
-    { id: '2', name: 'الأجهزة المنزلية', description: 'أجهزة كهربائية منزلية', productsCount: 8, isActive: true },
-    { id: '3', name: 'الملابس', description: 'ملابس رجالية ونسائية', productsCount: 25, isActive: false },
-  ]);
-  
+  const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubcatModelOpen, setIsSubcatModelOpen] = useState(false);
+  const [isEditcatModelOpen, setIsEditcatModelOpen] = useState(false);
+  const [categoryData, setCategoryData] = useState({name:'', id:'', image:''})
+  const [isCatModelOpen, setIsCatModelOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', isActive: true });
+  const [formData, setFormData] = useState({ name: '', subcategories: [] });
+  const [subCategoryData, setSubCategoryData] = useState({ categoryId: '', subCategoryId: '', subCategoryName: '' });
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const token = localStorage.getItem('token');
+  const [showPicker, setShowPicker] = useState(false);
 
-  const filteredCategories = categories.filter(category =>
-    category.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleEmojiClick = (emojiData) => {
+    setCategoryData(prev => ({
+      ...prev,
+      image: prev.image + emojiData.emoji
+    }));
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (editingCategory) {
-      setCategories(categories.map(cat => 
-        cat.id === editingCategory.id 
-          ? { ...cat, ...formData }
-          : cat
-      ));
-      toast({ title: "تم تحديث التصنيف بنجاح" });
-    } else {
-      const newCategory: Category = {
-        id: Date.now().toString(),
-        ...formData,
-        productsCount: 0,
-      };
-      setCategories([...categories, newCategory]);
-      toast({ title: "تم إضافة التصنيف بنجاح" });
+  const fetchCategories = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/categories', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        if (!res.ok) {
+          throw new Error('فشل في تحميل التصنيفات');
+        }
+        const data = await res.json();
+        setCategories(data.data);
+      } catch (error) {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تحميل التصنيفات',
+          variant: 'destructive',
+        });
+      }
+    };
+
+  useEffect(() => {    
+    fetchCategories();
+  }, []);
+
+  //Add sub
+  const handleAddSubCategory = async() => {
+    try {
+        const res = await fetch('http://localhost:5000/api/subcategories', {
+          method:"POST",
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify({
+            name: subCategoryData.subCategoryName,
+            category : categoryData.id
+          }),
+        });
+        if (!res.ok) {
+          toast({
+            title: 'خطأ',
+            description: 'فشل في انشاء التصنيف',
+            variant: 'destructive',
+          });
+          throw new Error('فشل في انشاء التصنيف');
+        }
+        setIsSubcatModelOpen(false)
+        setSubCategoryData({ categoryId: '', subCategoryId: '', subCategoryName: '' });
+        toast({ title: 'تم انشاء التصنيف بنجاح'})
+        fetchCategories();
+      } catch (error) {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في انشاء التصنيف',
+          variant: 'destructive',
+        });
+      }          
+  };
+
+  //Add Cat - Updated to include image
+  const handleAddCategory = async() => {
+    console.log(categoryData)
+     try {
+        const res = await fetch('http://localhost:5000/api/categories', {
+          method:"POST",
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify({
+            name: categoryData.name,
+            image: categoryData.image, // Now sending image with name
+          }),
+        });
+        if (!res.ok) {
+          toast({
+            title: 'خطأ',
+            description: 'فشل في انشاء التصنيف',
+            variant: 'destructive',
+          });
+          throw new Error('فشل في انشاء التصنيف');
+        }
+        setIsCatModelOpen(false)
+        setCategoryData({id:'', name:'', image:''})
+        toast({ title: 'تم انشاء التصنيف بنجاح'})
+        fetchCategories();
+      } catch (error) {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في انشاء التصنيف',
+          variant: 'destructive',
+        });
+      }       
+  };
+
+  //Edit Cat - Updated to include image
+  const handleEditCategory = async() => {
+    try {
+        const res = await fetch(`http://localhost:5000/api/categories/${categoryData.id}`, {
+          method:"PUT",
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify({
+            name: categoryData.name,
+            image: categoryData.image // Now sending image with name for editing
+          }),
+        });
+        if (!res.ok) {
+          toast({
+            title: 'خطأ',
+            description: 'فشل في تعديل التصنيف',
+            variant: 'destructive',
+          });
+          throw new Error('فشل في تعديل التصنيف');
+        }
+        setIsEditcatModelOpen(false)
+        setCategoryData({id:'', name:'', image:''})
+        toast({ title: 'تم تعديل التصنيف بنجاح'})
+        fetchCategories();
+      } catch (error) {
+        toast({
+          title: 'خطأ',
+          description: 'فشل في تعديل التصنيف',
+          variant: 'destructive',
+        });
+      }       
+  }
+
+  //Delete Category
+  const handleDeleteCategory = async(categoryId: string) => {
+   try{
+      const res = await fetch(`http://localhost:5000/api/categories/${categoryId}`, {
+        method: 'DELETE',  
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        if (!res.ok) {
+          toast({ title: 'فشل في حذف التصنيفات' });
+          throw new Error('فشل في حذف التصنيفات');          
+          return;
+        }
+        toast({ title: 'تم حذف الفئة بنجاح' });
+        fetchCategories();      
     }
-    
-    setIsDialogOpen(false);
-    setEditingCategory(null);
-    setFormData({ name: '', description: '', isActive: true });
+    catch(err){
+      console.log(err)
+    }    
   };
 
-  const handleEdit = (category: Category) => {
-    setEditingCategory(category);
-    setFormData({
-      name: category.name,
-      description: category.description,
-      isActive: category.isActive,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    setCategories(categories.filter(cat => cat.id !== id));
-    toast({ title: "تم حذف التصنيف بنجاح" });
-  };
-
-  const openAddDialog = () => {
-    setEditingCategory(null);
-    setFormData({ name: '', description: '', isActive: true });
-    setIsDialogOpen(true);
+  //Delete subCat
+  const handleDeleteSubCategory = async(subCategoryId: string) => {
+    try{
+      const res = await fetch(`http://localhost:5000/api/subcategories/${subCategoryId}`, {
+        method: 'DELETE',  
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        if (!res.ok) {
+          toast({ title: 'فشل في حذف التصنيفات' });
+          throw new Error('فشل في حذف التصنيفات');          
+        }
+        toast({ title: 'تم حذف الفئة بنجاح' });
+        fetchCategories();      
+    }
+    catch(err){
+      console.log(err)
+    }
   };
 
   return (
-    <BaseLayout>
+    <BaseLayout dir="rtl" className="bg-surface">
       <div className="flex min-h-screen">
         <AdminSidebar />
-        
+
         <div className="flex-1 p-8">
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
               <h1 className="text-3xl font-bold">إدارة التصنيفات</h1>
-              
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={openAddDialog} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    إضافة تصنيف جديد
-                  </Button>
-                </DialogTrigger>
-                
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingCategory ? 'تعديل التصنيف' : 'إضافة تصنيف جديد'}
-                    </DialogTitle>
-                  </DialogHeader>
-                  
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">اسم التصنيف</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="أدخل اسم التصنيف"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="description">الوصف</Label>
-                      <Textarea
-                        id="description"
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="أدخل وصف التصنيف"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="isActive"
-                        checked={formData.isActive}
-                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                        className="rounded"
-                      />
-                      <Label htmlFor="isActive">تصنيف نشط</Label>
-                    </div>
-                    
-                    <div className="flex gap-3 pt-4">
-                      <Button type="submit" className="flex-1">
-                        {editingCategory ? 'تحديث' : 'إضافة'}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setIsDialogOpen(false)}
-                        className="flex-1"
-                      >
-                        إلغاء
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              <Button
+                onClick={() => {
+                  setIsCatModelOpen(true)
+                }}
+                className="gap-2 px-4 py-2 rounded-md bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                <Plus className="h-4 w-4" />
+                إضافة تصنيف جديد
+              </Button>
             </div>
 
-            {/* Search */}
-            <div className="mb-6">
-              <div className="relative max-w-md">
-                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="البحث في التصنيفات..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-10"
-                />
-              </div>
-            </div>
-
-            {/* Categories Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCategories.map((category) => (
-                <Card key={category.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg">{category.name}</CardTitle>
-                      <Badge variant={category.isActive ? "default" : "secondary"}>
-                        {category.isActive ? 'نشط' : 'غير نشط'}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      {category.description}
-                    </p>
-                    
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                      <Package className="h-4 w-4" />
-                      <span>{category.productsCount} منتج</span>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(category)}
-                        className="flex-1 gap-2"
+            {/* Category Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {categories.map((category) => (
+                <div
+                  key={category._id}
+                  className="category-card bg-white p-4 rounded-lg border border-gray-300 shadow-md"
+                >
+                  <div className="category-header flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold">{category.image}{category.name}</h3>
+                    <div className="category-actions flex gap-2">
+                      <button
+                        className="btn-icon edit-category bg-blue-500 text-white p-2 rounded-md"
+                        onClick={()=>{
+                            setCategoryData({id:category._id ,name: category.name, image: category.image}) // Fixed: use category.image instead of category.name
+                            setIsEditcatModelOpen(true)
+                        }}
                       >
                         <Edit className="h-4 w-4" />
-                        تعديل
-                      </Button>
-                      
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(category.id)}
-                        className="gap-2"
+                      </button>
+                      <button
+                        className="btn-icon delete-category bg-red-500 text-white p-2 rounded-md"
+                        onClick={() => {handleDeleteCategory(category._id)}}
                       >
                         <Trash2 className="h-4 w-4" />
-                        حذف
-                      </Button>
+                      </button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  <div className="subcategories mb-4">
+                    {category.subCategories.length > 0 ? (
+                      category.subCategories.map((subCategory) => (
+                        <div key={subCategory._id} className="subcategory flex justify-between items-center mb-2">
+                          <span className="subcategory-tag inline-block bg-blue-100 text-blue-700 rounded-md px-3 py-1 text-sm mr-2">
+                            {subCategory.name}
+                          </span>
+                          <div className="actions flex gap-2">
+                            <button
+                              className="delete-subcategory bg-red-500 text-white p-1 rounded-md"
+                              onClick={() => handleDeleteSubCategory(subCategory._id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-sm text-gray-500">لا توجد فئات فرعية</span>
+                    )}
+                  </div>
+
+                  <button
+                    className="add-subcategory-btn bg-green-500 text-white p-2 rounded-md w-full flex justify-center items-center gap-2"
+                    onClick={() => {
+                      setCategoryData({name:'',id:category._id, image: ""})
+                      setIsSubcatModelOpen(true)                      
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    إضافة فئة فرعية
+                  </button>
+                </div>
               ))}
             </div>
 
-            {filteredCategories.length === 0 && (
+            {categories.length === 0 && (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">لا توجد تصنيفات</p>
               </div>
@@ -230,6 +313,131 @@ const AdminCategoriesPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit category Modal */}
+      <Dialog open={isEditcatModelOpen} onOpenChange={setIsEditcatModelOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>تعديل التصنيف</DialogTitle>
+          </DialogHeader>
+          
+          {/* Category Name Input */}
+          <Input
+            value={categoryData.name}
+            onChange={(e) => setCategoryData({ ...categoryData, name: e.target.value })}
+            placeholder="أدخل اسم التصنيف"
+            className="mb-4"
+          />
+          
+          {/* Category Image/Emoji Input */}
+          <div className="relative mb-4">
+            <Input
+              value={categoryData.image}
+              onChange={(e) => setCategoryData({...categoryData, image: e.target.value})}
+              placeholder="اختر رمز للتصنيف"
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPicker(val => !val)}
+              className="absolute left-2 top-1/2 transform -translate-y-1/2 text-lg"
+            >
+              😀
+            </button>
+
+            {showPicker && (
+              <div className="absolute z-10 top-12 left-0">
+                <EmojiPicker onEmojiClick={handleEmojiClick} />
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-4">
+            <Button onClick={() => setIsEditcatModelOpen(false)} variant="outline">
+              إلغاء
+            </Button>
+            <Button onClick={handleEditCategory}>
+              حفظ التعديلات
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add subCategory */}
+      <Dialog open={isSubcatModelOpen} onOpenChange={setIsSubcatModelOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>اضافة فئة فرعية</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={subCategoryData.subCategoryName}
+            onChange={(e) => setSubCategoryData({ ...subCategoryData, subCategoryName: e.target.value })}
+            placeholder="أدخل اسم الفئة الفرعية"
+            className="mb-4"
+          />
+          <div className="flex gap-4">            
+            <Button onClick={() => setIsSubcatModelOpen(false)} variant="outline">
+              إلغاء
+            </Button>
+            <Button 
+              onClick={handleAddSubCategory} 
+              variant="destructive">
+              اضافة
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Category */}
+      <Dialog open={isCatModelOpen} onOpenChange={setIsCatModelOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>اضافة فئة</DialogTitle>
+          </DialogHeader>
+          
+          {/* Category Name Input */}
+          <Input
+            value={categoryData.name}
+            onChange={(e) => setCategoryData({...categoryData, name: e.target.value})}
+            placeholder="أدخل اسم الفئة"
+            className="mb-4"
+          />
+          
+          {/* Category Image/Emoji Input */}
+          <div dir="rtl" className="relative mb-4">
+            <Input
+              value={categoryData.image}
+              onChange={(e) => setCategoryData({...categoryData, image: e.target.value})}
+              placeholder="اختر رمز للفئة"
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPicker(val => !val)}
+              className="absolute left-2 top-1/2 transform -translate-y-1/2 text-lg"
+            >
+              😀
+            </button>
+
+            {showPicker && (
+              <div className="absolute z-10 top-12 left-0">
+                <EmojiPicker onEmojiClick={handleEmojiClick} />
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-4">            
+            <Button onClick={() => setIsCatModelOpen(false)} variant="outline">
+              إلغاء
+            </Button>
+            <Button 
+              onClick={handleAddCategory} 
+              variant="destructive">
+              اضافة
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </BaseLayout>
   );
 };

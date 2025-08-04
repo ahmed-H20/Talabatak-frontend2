@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BaseLayout } from '@/components/layout/BaseLayout';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,56 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Edit, Trash2, MapPin, Phone, Clock, Eye, Truck, Package, ArrowRight } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, useMapEvents ,Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix marker icon issue in leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:
+    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:
+    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+const LocationSelector = ({ onSelect }: { onSelect: (lat: number, lng: number) => void }) => {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      onSelect(lat, lng);
+    },
+  });
+  return null;
+};
+
+const LocationMarker = ({ setFormData }: { setFormData }) => {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      setFormData((prev) => ({
+        ...prev,
+        location: {
+          ...prev.location,
+          coordinates: {
+            lat,
+            lng,
+          },
+        },
+      }));
+    },
+  });
+  return null;
+};
 
 interface WorkingHours {
   day: string;
@@ -20,21 +70,37 @@ interface WorkingHours {
   isClosed: boolean;
 }
 
+// interface Store {
+//   id: string;
+//   name: string;
+//   description: string;
+//   address: string;
+//   phone: string;
+//   deliveryRange: string;
+//   productCount: number;
+//   isActive: boolean;
+//   location: {
+//     lat: number;
+//     lng: number;
+//   };
+//   workingHours: WorkingHours[];
+//   products: Product[];
+// }
+
 interface Store {
-  id: string;
+  _id: string;
   name: string;
   description: string;
-  address: string;
   phone: string;
-  deliveryRange: string;
-  productCount: number;
-  isActive: boolean;
+  workingHours: WorkingHours[]
+  isOpen: boolean;
   location: {
-    lat: number;
-    lng: number;
+    coordinates: { lat: number; lng: number };
+    address?: string;
   };
-  workingHours: WorkingHours[];
-  products: Product[];
+  products: Product []
+  city?: string;
+  deliveryRangeKm?: number; // in km
 }
 
 interface Product {
@@ -42,32 +108,62 @@ interface Product {
   name: string;
   description: string;
   price: number;
+  quantity: number;
+  discount: number;
+  discountedPrice: number;
   category: string;
   subcategory: string;
   image?: string;
 }
 
+ const getCityNameFromCoordinates = async (lat: number, lng: number): Promise<string | null> => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
+    );
+
+    if (!response.ok) throw new Error("Failed to fetch city name");
+
+    const data = await response.json();
+    const city : string =
+      data.address?.city ||
+      data.address?.town ||
+      data.address?.village ||
+      data.address?.state ||
+      data.address?.county || ''
+
+    return city || "فشل ايجاد المدينة";
+  } catch (error) {
+    console.error("Error in getCityNameFromCoordinates:", error);
+    return "فشل ايجاد المدينة";
+  }
+};
+
+
 const AdminStoresPage = () => {
   const { toast } = useToast();
   const [stores, setStores] = useState<Store[]>([
     {
-      id: '1',
+      _id: '1',
       name: 'متجر الإلكترونيات الحديثة',
       description: 'متجر متخصص في بيع الأجهزة الإلكترونية والتقنية',
-      address: 'القاهرة، مصر الجديدة',
       phone: '+966501234567',
-      deliveryRange: '15 كيلومتر من المتجر',
-      productCount: 1,
-      isActive: true,
-      location: { lat: 24.7136, lng: 46.6753 },
-      workingHours: [
-        { day: 'السبت', open: '22:00', close: '09:00', isClosed: false },
-        { day: 'الأحد', open: '22:00', close: '09:00', isClosed: false },
-        { day: 'الاثنين', open: '22:00', close: '09:00', isClosed: false },
-        { day: 'الثلاثاء', open: '22:00', close: '09:00', isClosed: false },
-        { day: 'الأربعاء', open: '22:00', close: '09:00', isClosed: false },
-        { day: 'الخميس', open: '22:00', close: '14:00', isClosed: false },
-        { day: 'الجمعة', open: '22:00', close: '14:00', isClosed: false },
+      isOpen: true,
+      city: "القاهرة",
+      location: { 
+        address:'',
+        coordinates: {
+          lat: 30.0444, lng: 31.2357
+        }
+       },
+        workingHours: [
+        { day: 'Saturday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Sunday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Monday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Tuesday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Wednesday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Thursday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Friday', open: '09:00', close: '22:00', isClosed: false },
       ],
       products: [
         {
@@ -76,33 +172,14 @@ const AdminStoresPage = () => {
           description: 'هاتف ذكي متطور بأحدث التقنيات',
           price: 4500,
           category: 'الإلكترونيات',
-          subcategory: 'هواتف ذكية'
+          subcategory: 'هواتف ذكية',
+          quantity: 10,
+          discount: 0,
+          discountedPrice: 5000
         }
       ]
-    },
-    {
-      id: '2',
-      name: 'متجر الأزياء العصرية',
-      description: 'متجر للملابس والأزياء الحديثة',
-      address: 'الإسكندرية، سموحة',
-      phone: '+966507654321',
-      deliveryRange: '20 كيلومتر من المتجر',
-      productCount: 1,
-      isActive: true,
-      location: { lat: 21.4858, lng: 39.1925 },
-      workingHours: [
-        { day: 'السبت', open: '23:00', close: '10:00', isClosed: false },
-        { day: 'الأحد', open: '23:00', close: '10:00', isClosed: false },
-        { day: 'الاثنين', open: '23:00', close: '10:00', isClosed: false },
-        { day: 'الثلاثاء', open: '23:00', close: '10:00', isClosed: false },
-        { day: 'الأربعاء', open: '23:00', close: '10:00', isClosed: false },
-        { day: 'الخميس', open: '23:00', close: '10:00', isClosed: false },
-        { day: 'الجمعة', open: '23:00', close: '10:00', isClosed: false },
-      ],
-      products: []
-    },
-  ]);
-  
+    }
+  ]);  
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'detail'>('grid');
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
@@ -110,52 +187,106 @@ const AdminStoresPage = () => {
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
-    address: '',
+    description: '',    
     phone: '',
-    deliveryRange: '',
-    isActive: true,
-    location: { lat: 0, lng: 0 },
+    deliveryRangeKm: 0,
+    isOpen: true,
+    city: '',
+    location: { 
+        address:'',
+        coordinates: {
+          lat: 30.0444, lng: 31.2357
+        }
+    },
     workingHours: [
-      { day: 'السبت', open: '09:00', close: '22:00', isClosed: false },
-      { day: 'الأحد', open: '09:00', close: '22:00', isClosed: false },
-      { day: 'الاثنين', open: '09:00', close: '22:00', isClosed: false },
-      { day: 'الثلاثاء', open: '09:00', close: '22:00', isClosed: false },
-      { day: 'الأربعاء', open: '09:00', close: '22:00', isClosed: false },
-      { day: 'الخميس', open: '09:00', close: '22:00', isClosed: false },
-      { day: 'الجمعة', open: '09:00', close: '22:00', isClosed: false },
+      { day: 'Saturday', open: '09:00', close: '22:00', isClosed: false },
+      { day: 'Sunday', open: '09:00', close: '22:00', isClosed: false },
+      { day: 'Monday', open: '09:00', close: '22:00', isClosed: false },
+      { day: 'Tuesday', open: '09:00', close: '22:00', isClosed: false },
+      { day: 'Wednesday', open: '09:00', close: '22:00', isClosed: false },
+      { day: 'Thursday', open: '09:00', close: '22:00', isClosed: false },
+      { day: 'Friday', open: '09:00', close: '22:00', isClosed: false },
     ]
+
   });
+  const token = localStorage.getItem("token")
+
+  const fetchStores = async () => {
+        try {
+            const res = await fetch('http://localhost:5000/api/stores',{
+                headers: {
+                    'Content-Type': 'application/json',                    
+                      ...(token && { Authorization: `Bearer ${token}` }),
+                },
+            });
+            const data = await res.json();
+            setStores(data.data);
+        } catch (error) {
+        toast({ title: 'فشل في تحميل المتاجر', description: String(error) });
+        }
+    };
+
+  //Fetsh stores
+  useEffect(() => {
+    fetchStores();
+  }, []);
+
+  console.log(stores)
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.address.toLowerCase().includes(searchTerm.toLowerCase())
+    store.location.address.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async(e: React.FormEvent) => {
     e.preventDefault();
-    
+    console.log(formData)
     if (editingStore) {
-      setStores(stores.map(store => 
-        store.id === editingStore.id 
-          ? { 
-              ...store, 
-              ...formData,
-              productCount: store.productCount,
-              products: store.products 
-            }
-          : store
-      ));
-      toast({ title: "تم تحديث المتجر بنجاح" });
+     try {
+        const res = await fetch(`http://localhost:5000/api/stores/${editingStore._id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` }),
+            },
+            body: JSON.stringify({...formData, city: await getCityNameFromCoordinates(formData.location.coordinates.lat, formData.location.coordinates.lng)}),
+        });
+        if(!res){
+          console.log("Store not updated");
+        }
+        const data = await res.json();
+        console.log("Store updated successfully", data);
+        toast({ title: 'تم تحديث المتجر'});
+        setIsDialogOpen(false);
+        fetchStores()
+        setEditingStore(null);               
+      }
+      catch (error) {
+          toast({ title: 'فشل في تحديث المتجر', description: String(error) });
+      }
     } else {
-      const newStore: Store = {
-        id: Date.now().toString(),
-        ...formData,
-        productCount: 0,
-        products: []
-      };
-      setStores([...stores, newStore]);
-      toast({ title: "تم إضافة المتجر بنجاح" });
+      try {
+        const res = await fetch(`http://localhost:5000/api/stores`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` }),
+            },
+            body: JSON.stringify({...formData, city: await getCityNameFromCoordinates(formData.location.coordinates.lat, formData.location.coordinates.lng)}),
+        });
+        if(!res){
+          console.log("Store not Created");
+        }
+        const data = await res.json();
+        console.log("Store updated successfully", data);
+        toast({ title: 'تم اضافة المتجر'});
+        setIsDialogOpen(false);
+        fetchStores()
+        setEditingStore(null);               
+      }
+      catch (error) {
+          toast({ title: 'فشل في تحديث المتجر', description: String(error) });
+      }
     }
     
     setIsDialogOpen(false);
@@ -167,41 +298,64 @@ const AdminStoresPage = () => {
     setFormData({
       name: '',
       description: '',
-      address: '',
       phone: '',
-      deliveryRange: '',
-      isActive: true,
-      location: { lat: 0, lng: 0 },
+      deliveryRangeKm: 0,
+      city:'',
+      isOpen: true,
+      location: {
+        coordinates:{ lat: 30.0444, lng: 31.2357 },
+        address:''
+      },
       workingHours: [
-        { day: 'السبت', open: '09:00', close: '22:00', isClosed: false },
-        { day: 'الأحد', open: '09:00', close: '22:00', isClosed: false },
-        { day: 'الاثنين', open: '09:00', close: '22:00', isClosed: false },
-        { day: 'الثلاثاء', open: '09:00', close: '22:00', isClosed: false },
-        { day: 'الأربعاء', open: '09:00', close: '22:00', isClosed: false },
-        { day: 'الخميس', open: '09:00', close: '22:00', isClosed: false },
-        { day: 'الجمعة', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Saturday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Sunday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Monday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Tuesday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Wednesday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Thursday', open: '09:00', close: '22:00', isClosed: false },
+        { day: 'Friday', open: '09:00', close: '22:00', isClosed: false },
       ]
     });
   };
 
-  const handleEdit = (store: Store) => {
+  const handleEdit = async(store: Store) => {
+    const cityName = await getCityNameFromCoordinates(store.location.coordinates.lat, store.location.coordinates.lng)
     setEditingStore(store);
     setFormData({
       name: store.name,
       description: store.description,
-      address: store.address,
       phone: store.phone,
-      deliveryRange: store.deliveryRange,
-      isActive: store.isActive,
-      location: store.location,
+      deliveryRangeKm: store.deliveryRangeKm,
+      isOpen: store.isOpen,
+      city: cityName || '',
+      location: {
+        coordinates:{
+          lat: store.location.coordinates.lat,
+          lng: store.location.coordinates.lng,
+        },
+        address:store.location.address,
+      },
       workingHours: store.workingHours
-    });
+    });    
     setIsDialogOpen(true);
   };
 
   const handleDelete = (id: string) => {
-    setStores(stores.filter(store => store.id !== id));
-    toast({ title: "تم حذف المتجر بنجاح" });
+    // Call API to delete store
+    fetch(`http://localhost:5000/api/stores/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+    .then(() => {
+      setStores(stores.filter(store => store._id !== id));
+      toast({ title: "تم حذف المتجر بنجاح" });
+    })
+    .catch((error) => {
+      toast({ title: "فشل في حذف المتجر", description: String(error) });
+    });
   };
 
   const handleView = (store: Store) => {
@@ -223,7 +377,7 @@ const AdminStoresPage = () => {
 
   if (viewMode === 'detail' && selectedStore) {
     return (
-      <BaseLayout>
+    <BaseLayout dir="rtl" className="bg-surface">
         <div className="flex min-h-screen">
           <AdminSidebar />
           
@@ -264,8 +418,8 @@ const AdminStoresPage = () => {
                     <CardContent className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">الحالة:</span>
-                        <Badge variant={selectedStore.isActive ? "default" : "secondary"}>
-                          {selectedStore.isActive ? 'مفتوح الآن' : 'مغلق'}
+                        <Badge variant={selectedStore.isOpen ? "default" : "secondary"}>
+                          {selectedStore.isOpen ? 'مفتوح الآن' : 'مغلق'}
                         </Badge>
                       </div>
                       
@@ -276,17 +430,22 @@ const AdminStoresPage = () => {
                       
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{selectedStore.address}</span>
+                        <span>{selectedStore.location.address}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedStore.city}</span>
                       </div>
                       
                       <div className="flex items-center gap-2">
                         <Truck className="h-4 w-4 text-muted-foreground" />
-                        <span>نطاق التوصيل: {selectedStore.deliveryRange}</span>
+                        <span>نطاق التوصيل: {selectedStore.deliveryRangeKm}</span>
                       </div>
                       
                       <div className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-muted-foreground" />
-                        <span>{selectedStore.productCount} منتج متاح</span>
+                        <span>{selectedStore.products.length} منتج متاح</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -297,15 +456,30 @@ const AdminStoresPage = () => {
                       <CardTitle>موقع المتجر على الخريطة</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
-                        <div className="text-center">
-                          <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-muted-foreground">خريطة الموقع</p>
-                          <p className="text-sm text-muted-foreground">
-                            {selectedStore.location.lat}, {selectedStore.location.lng}
-                          </p>
-                        </div>
-                      </div>
+                      {/* <div className="h-64 bg-muted rounded-lg flex items-center justify-center"> */}
+                        {/* <div className="text-center"> */}
+                          {/* <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground" /> */}
+                          {/* <p className="text-muted-foreground">خريطة الموقع</p> */}
+                          <MapContainer className='h-64 bg-muted rounded-lg flex items-center justify-center'
+                            center={[selectedStore.location.coordinates.lat, selectedStore.location.coordinates.lng]} // latitude, longitude
+                            zoom={13}
+                            style={{ height: '400px', width: '100%', marginTop: '1rem' }}
+                          >
+                            <TileLayer
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                              attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+                            />
+                            <Marker position={[selectedStore.location.coordinates.lat, selectedStore.location.coordinates.lng]}>
+                              <Popup>
+                                موقع المتجر 
+                              </Popup>
+                            </Marker>
+                          </MapContainer>
+                          {/* <p className="text-sm text-muted-foreground">
+                            {selectedStore.location.coordinates.lat}, {selectedStore.location.coordinates.lng}
+                          </p> */}
+                        {/* </div> */}
+                      {/* </div> */}
                     </CardContent>
                   </Card>
 
@@ -324,12 +498,14 @@ const AdminStoresPage = () => {
                               <TableHead>الفئة الرئيسية</TableHead>
                               <TableHead>الفئة الفرعية</TableHead>
                               <TableHead>السعر</TableHead>
-                              <TableHead>العمليات</TableHead>
+                              <TableHead>الكمية</TableHead>
+                              <TableCell> % نسبة الخصم </TableCell>
+                              <TableCell>السعر بعد الخصم</TableCell>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {selectedStore.products.map((product) => (
-                              <TableRow key={product.id}>
+                            {selectedStore.products.map((product,index) => (
+                              <TableRow key={index}>
                                 <TableCell>
                                   <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
                                     <Package className="h-6 w-6 text-muted-foreground" />
@@ -339,7 +515,7 @@ const AdminStoresPage = () => {
                                 <TableCell>{product.category}</TableCell>
                                 <TableCell>{product.subcategory}</TableCell>
                                 <TableCell>{product.price} ر.س</TableCell>
-                                <TableCell>
+                                {/* <TableCell>
                                   <div className="flex gap-2">
                                     <Button size="sm" variant="outline">
                                       <Edit className="h-4 w-4" />
@@ -348,7 +524,10 @@ const AdminStoresPage = () => {
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </div>
-                                </TableCell>
+                                </TableCell> */}
+                                <TableCell>{product.quantity}</TableCell>
+                                <TableCell>{product.discount}</TableCell>
+                                <TableCell>{product.discountedPrice}</TableCell>                                
                               </TableRow>
                             ))}
                           </TableBody>
@@ -409,7 +588,7 @@ const AdminStoresPage = () => {
   }
 
   return (
-    <BaseLayout>
+    <BaseLayout dir="rtl" className="bg-surface">
       <div className="flex min-h-screen">
         <AdminSidebar />
         
@@ -474,20 +653,30 @@ const AdminStoresPage = () => {
                       <Label htmlFor="address">العنوان</Label>
                       <Textarea
                         id="address"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        value={formData.location.address}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            location: {
+                              ...formData.location,
+                              address: e.target.value, 
+                            },
+                          })
+                        }
                         placeholder="أدخل عنوان المتجر"
                         rows={2}
                         required
                       />
+
                     </div>
 
                     <div>
                       <Label htmlFor="deliveryRange">نطاق التوصيل</Label>
                       <Input
+                        type='number'
                         id="deliveryRange"
-                        value={formData.deliveryRange}
-                        onChange={(e) => setFormData({ ...formData, deliveryRange: e.target.value })}
+                        value={formData.deliveryRangeKm}
+                        onChange={(e) => setFormData({ ...formData, deliveryRangeKm:  parseInt(e.target.value) })}
                         placeholder="15 كيلومتر من المتجر"
                         required
                       />
@@ -500,11 +689,20 @@ const AdminStoresPage = () => {
                           id="lat"
                           type="number"
                           step="any"
-                          value={formData.location.lat}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            location: { ...formData.location, lat: parseFloat(e.target.value) || 0 }
-                          })}
+                          value={formData.location.coordinates.lat}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              location: {
+                                ...formData.location,
+                                coordinates: {
+                                  ...formData.location.coordinates,
+                                  lat: parseFloat(e.target.value) || 0
+                                }
+                              }
+                            })
+                          }
+
                           placeholder="24.7136"
                         />
                       </div>
@@ -514,14 +712,46 @@ const AdminStoresPage = () => {
                           id="lng"
                           type="number"
                           step="any"
-                          value={formData.location.lng}
-                          onChange={(e) => setFormData({
+                          value={formData.location.coordinates.lng}                          
+                          onChange={(e) =>setFormData({
                             ...formData,
-                            location: { ...formData.location, lng: parseFloat(e.target.value) || 0 }
+                            location: {
+                              ...formData.location,
+                              coordinates: {
+                                ...formData.location.coordinates,
+                                lng: parseFloat(e.target.value) || 0
+                              }
+                            }
                           })}
                           placeholder="46.6753"
                         />
                       </div>
+                      <MapContainer
+                        center={[formData.location.coordinates.lat, formData.location.coordinates.lng]}
+                        zoom={13}
+                        style={{ height: '400px', width: '100%', marginTop: '1rem' }}
+                      >
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='&copy; OpenStreetMap contributors'
+                        />
+
+                        <LocationSelector
+                          onSelect={(lat, lng) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              location: {
+                                ...prev.location,
+                                coordinates: { lat, lng },
+                              },
+                            }));
+                          }}
+                        />
+
+                        <Marker position={[formData.location.coordinates.lat, formData.location.coordinates.lng]}>
+                          <Popup>موقع المتجر</Popup>
+                        </Marker>
+                      </MapContainer>
                     </div>
 
                     {/* Working Hours */}
@@ -563,8 +793,8 @@ const AdminStoresPage = () => {
                       <input
                         type="checkbox"
                         id="isActive"
-                        checked={formData.isActive}
-                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                        checked={formData.isOpen}
+                        onChange={(e) => setFormData({ ...formData, isOpen: e.target.checked })}
                         className="rounded"
                       />
                       <Label htmlFor="isActive">متجر نشط</Label>
@@ -604,12 +834,12 @@ const AdminStoresPage = () => {
             {/* Stores Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filteredStores.map((store) => (
-                <Card key={store.id} className="hover:shadow-lg transition-shadow">
+                <Card key={store._id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <CardTitle className="text-lg">{store.name}</CardTitle>
-                      <Badge variant={store.isActive ? "default" : "secondary"} className="bg-green-100 text-green-800">
-                        {store.isActive ? 'مفتوح الآن' : 'مغلق'}
+                      <Badge variant={store.isOpen ? "default" : "secondary"} className="bg-green-100 text-green-800">
+                        {store.isOpen ? 'مفتوح الآن' : 'مغلق'}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -622,17 +852,17 @@ const AdminStoresPage = () => {
                     <div className="space-y-2 text-sm mb-4">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <MapPin className="h-4 w-4 text-red-500" />
-                        <span>{store.address}</span>
+                        <span>{store.location.address}</span>
                       </div>
                       
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Truck className="h-4 w-4 text-blue-500" />
-                        <span>نطاق التوصيل: {store.deliveryRange}</span>
+                        <span>نطاق التوصيل: {store.deliveryRangeKm}</span>
                       </div>
                       
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Package className="h-4 w-4 text-blue-500" />
-                        <span>{store.productCount} منتج</span>
+                        <span>{store.products.length} منتج</span>
                       </div>
                     </div>
 
@@ -683,7 +913,7 @@ const AdminStoresPage = () => {
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => handleDelete(store.id)}
+                        onClick={() => handleDelete(store._id)}
                         className="gap-2"
                       >
                         <Trash2 className="h-4 w-4" />

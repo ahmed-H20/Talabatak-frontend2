@@ -6,7 +6,8 @@ import {
   FolderTree, 
   Settings,
   Store,
-  MapPin
+  MapPin,
+  Ticket
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -37,15 +38,15 @@ const AdminSidebar = () => {
       icon: Store
     },
     {
-      title: 'المواقع',
-      href: '/admin/locations',
-      icon: MapPin
+      title: 'كوبونات الخصم',
+      href: '/admin/coupons',
+      icon: Ticket
     },
-    {
-      title: 'إعدادات الموقع',
-      href: '/admin/settings',
-      icon: Settings
-    }
+    // {
+    //   title: 'إعدادات الموقع',
+    //   href: '/admin/settings',
+    //   icon: Settings
+    // }
   ];
 
   return (
@@ -56,7 +57,7 @@ const AdminSidebar = () => {
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <Store className="h-5 w-5 text-white" />
           </div>
-          <span className="font-bold text-lg">شاملول ستور</span>
+          <span className="font-bold text-lg">طلاباتك ستور 🛍️</span>
         </div>
       </div>
 

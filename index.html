@@ -6,7 +6,7 @@
     <title>Talabatak</title>
     <meta name="description" content="Talabatak is a platform that connects customers with their nearest stores." />
     <meta name="author" content="Ahmed Hesham" />
-
+    
     <meta property="og:title" content="Talabatak" />
     <meta property="og:description" content="Story about Talabatak" />
     <meta property="og:type" content="website" />
@@ -21,4 +21,12 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
+  script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  window.onload = function () {
+    google.accounts.id.initialize({
+      client_id: '599763874700-ma2che296dum9ktpadcirtdktdke3j32.apps.googleusercontent.com'
+    });
+  };
+</script>
 </html>

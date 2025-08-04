@@ -26,13 +26,14 @@ const LoginPage = () => {
     try {
       const result = await authService.login(credentials.phone, credentials.password);
       
+      navigate(from, { replace: true });
+
       toast({
         title: "تم تسجيل الدخول بنجاح",
         description: `مرحباً بك ${result.user.name}`,
         className: "bg-success text-success-foreground"
       });
-
-      navigate(from, { replace: true });
+     
     } catch (error) {
       toast({
         title: "خطأ في تسجيل الدخول",

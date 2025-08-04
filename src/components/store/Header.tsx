@@ -137,7 +137,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLocation } from '@/contexts/LocationContext';
@@ -180,8 +180,7 @@ const CITIES = [
 export const Header = ({ 
   cartItemCount = 0, 
   onCartClick, 
-  onMenuClick 
-}: HeaderProps) => {
+  }: HeaderProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
@@ -190,7 +189,7 @@ export const Header = ({
   const [loading, setLoading] = useState(false);
   const [cityName, setCityName] = useState<string>("اختر موقعك"); // To display selected city
 
-  useEffect(() => {    
+  useMemo(() => {    
     if (!location) {
       setCityName('لم يتم تحديد الموقع');
     } else {

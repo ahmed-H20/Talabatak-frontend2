@@ -267,13 +267,14 @@ export interface CartItem {
   id: string;
   product: Product;
   quantity: number;
+
 }
 
 // Order status types
-export type OrderStatus = 'processing' | 'delivered' | 'rejected' | 'pending';
+export type OrderStatus = 'processing' | 'delivered' | 'cancelled' | 'pending';
 
 // Mock cart data
-export const mockCartItems: CartItem[] = [
+export const mockCartItems: CartItem = [
   {
     id: '1',
     product: mockProducts[0], // Apple
