@@ -7,7 +7,8 @@ import {
   Settings,
   Store,
   MapPin,
-  Ticket
+  Ticket,
+  Bike
 } from 'lucide-react';
 
 const AdminSidebar = () => {
@@ -42,11 +43,11 @@ const AdminSidebar = () => {
       href: '/admin/coupons',
       icon: Ticket
     },
-    // {
-    //   title: 'إعدادات الموقع',
-    //   href: '/admin/settings',
-    //   icon: Settings
-    // }
+    {
+      title: 'Delivary',
+      href: '/admin/delivery',
+      icon: Bike
+    }
   ];
 
   return (

@@ -9,6 +9,7 @@ import { BaseLayout } from '@/components/layout/BaseLayout';
 import { Container } from '@/components/layout/Container';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/services/authService';
+import { json } from 'stream/consumers';
 
 const LoginPage = () => {
   const [credentials, setCredentials] = useState({ phone: '', password: '' });
@@ -25,8 +26,18 @@ const LoginPage = () => {
 
     try {
       const result = await authService.login(credentials.phone, credentials.password);
+      console.log(result.role)
+      if (result.role == "delivery"){
+        navigate("/deliveryDashboard");      
+      }
+      else if(result.role == "admin"){
+        navigate("/admin/dashboard");
+      }
+      else{
+        navigate("/");
+        window.location.reload();
+      }    
       
-      navigate(from, { replace: true });
 
       toast({
         title: "تم تسجيل الدخول بنجاح",

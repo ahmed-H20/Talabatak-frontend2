@@ -131,7 +131,6 @@
 //     </header>
 //   );
 // };
-
 import { Search, ShoppingCart, Menu, MapPin, User, LogOut, LocateFixed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,10 +140,22 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLocation } from '@/contexts/LocationContext';
+
 interface HeaderProps {
   cartItemCount?: number;
   onCartClick?: () => void;
   onMenuClick?: () => void;
+}
+
+interface DetailedAddress {
+  street?: string;
+  houseNumber?: string;
+  neighbourhood?: string;
+  district?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postcode?: string;
 }
 
 // cities
@@ -174,7 +185,6 @@ const CITIES = [
   { name: "المنيا", lat: 28.1000, lon: 30.7500 },
   { name: "دمنهور", lat: 31.0333, lon: 30.4667 },
   { name: "كفر الشيخ", lat: 31.1167, lon: 30.9333 },
-
 ];
 
 export const Header = ({ 
@@ -187,61 +197,106 @@ export const Header = ({
 
   const { location, setLocation } = useLocation();
   const [loading, setLoading] = useState(false);
-  const [cityName, setCityName] = useState<string>("اختر موقعك"); // To display selected city
+  const [locationDisplay, setLocationDisplay] = useState<string>("اختر موقعك");
+  const [detailedAddress, setDetailedAddress] = useState<DetailedAddress | null>(null);
 
   useMemo(() => {    
     if (!location) {
-      setCityName('لم يتم تحديد الموقع');
+      setLocationDisplay('لم يتم تحديد الموقع');
     } else {
       // Check if lat/lon matches one of the known cities
       const found = CITIES.find(
         (c) => c.lat === location.lat && c.lon === location.lon
       );
-      if (found) setCityName(found.name);
-      else setCityName(`${localStorage.getItem('userCity')} ,تم تحديد موقعك الحالي`);
+      if (found) {
+        setLocationDisplay(found.name);
+      } else {
+        // Use stored detailed address if available
+        const storedAddress = localStorage.getItem('userDetailedAddress');
+        if (storedAddress) {
+          const address = JSON.parse(storedAddress);
+          setDetailedAddress(address);
+          setLocationDisplay(formatAddressForDisplay(address));
+        } else {
+          setLocationDisplay('موقعي الحالي');
+        }
+      }
     }
   }, [location]);
 
-  const fetchCityName = async (lat: number, lon: number) => {
+  const formatAddressForDisplay = (address: DetailedAddress): string => {
+    const parts = [];
+    
+    // Add house number and street
+    if (address.houseNumber && address.street) {
+      parts.push(`${address.houseNumber} ${address.street}`);
+    } else if (address.street) {
+      parts.push(address.street);
+    }
+    
+    // Add neighbourhood or district
+    if (address.neighbourhood) {
+      parts.push(address.neighbourhood);
+    } else if (address.district) {
+      parts.push(address.district);
+    }
+    
+    // Add city
+    if (address.city) {
+      parts.push(address.city);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : 'موقعي الحالي';
+  };
+
+  const formatFullAddress = (address: DetailedAddress): string => {
+    const parts = [];
+    
+    if (address.houseNumber) parts.push(address.houseNumber);
+    if (address.street) parts.push(address.street);
+    if (address.neighbourhood) parts.push(address.neighbourhood);
+    if (address.district) parts.push(address.district);
+    if (address.city) parts.push(address.city);
+    if (address.state) parts.push(address.state);
+    if (address.postcode) parts.push(address.postcode);
+    
+    return parts.join(', ');
+  };
+
+  const fetchDetailedAddress = async (lat: number, lon: number): Promise<DetailedAddress> => {
     try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-        const data = await res.json();
-        return (
-        data.address.city ||
-        data.address.town ||
-        data.address.village ||
-        "مدينة غير معروفة"
-        );
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=ar,en`
+      );
+      const data = await res.json();
+      
+      const address: DetailedAddress = {
+        houseNumber: data.address?.house_number,
+        street: data.address?.road || data.address?.street,
+        neighbourhood: data.address?.neighbourhood || data.address?.suburb,
+        district: data.address?.city_district || data.address?.district,
+        city: data.address?.city || data.address?.town || data.address?.village,
+        state: data.address?.state || data.address?.governorate,
+        country: data.address?.country,
+        postcode: data.address?.postcode
+      };
+      
+      return address;
     } catch (error) {
-        console.error("فشل جلب اسم المدينة:", error);
-        return "مدينة غير معروفة";
+      console.error("فشل جلب تفاصيل العنوان:", error);
+      return {
+        city: "مدينة غير معروفة"
+      };
     }
   };
 
   const handleSelectCity = (lat: number, lon: number, name: string) => {
     setLocation({ lat, lon });
-    setCityName(name);
+    setLocationDisplay(name);
+    setDetailedAddress(null);
+    // Clear detailed address from storage when selecting predefined city
+    localStorage.removeItem('userDetailedAddress');
   };
-
-  // const handleDetectLocation = () => {
-  //   setLoading(true);
-  //   navigator.geolocation.getCurrentPosition(
-  //     (pos) => {
-  //       const coords = {
-  //         lat: pos.coords.latitude,
-  //         lon: pos.coords.longitude
-  //       };
-  //       setLocation(coords);
-  //       setCityName('تم تحديد موقعك الحالي');
-  //       setLoading(false);
-  //     },
-  //     (err) => {
-  //       console.error('فشل تحديد الموقع:', err);
-  //       setCityName('تعذر تحديد الموقع');
-  //       setLoading(false);
-  //     }
-  //   );
-  // };
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
@@ -250,6 +305,8 @@ export const Header = ({
     }
 
     setLoading(true);
+    setLocationDisplay('جارٍ تحديد الموقع...');
+    
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const coords = {
@@ -259,31 +316,41 @@ export const Header = ({
         setLocation(coords);
         localStorage.setItem("userLocation", JSON.stringify(coords));
 
-        // 👇 هنا الإضافة
-        const name = await fetchCityName(coords.lat, coords.lon);
-        setCityName(name);
-        localStorage.setItem("userCity", name);
+        // Fetch detailed address information
+        const address = await fetchDetailedAddress(coords.lat, coords.lon);
+        setDetailedAddress(address);
+        localStorage.setItem("userDetailedAddress", JSON.stringify(address));
+        
+        const displayText = formatAddressForDisplay(address);
+        setLocationDisplay(displayText);
 
         setLoading(false);
       },
       (err) => {
         console.error("فشل تحديد الموقع:", err);
-        setCityName("تعذر تحديد الموقع");
+        setLocationDisplay("تعذر تحديد الموقع");
         setLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes
       }
     );
   };
 
   useEffect(() => {
     const storedLocation = localStorage.getItem("userLocation");
-    const storedCity = localStorage.getItem("userCity");
+    const storedDetailedAddress = localStorage.getItem("userDetailedAddress");
 
     if (storedLocation) {
       setLocation(JSON.parse(storedLocation));
     }
 
-    if (storedCity) {
-      setCityName(storedCity);
+    if (storedDetailedAddress) {
+      const address = JSON.parse(storedDetailedAddress);
+      setDetailedAddress(address);
+      setLocationDisplay(formatAddressForDisplay(address));
     }
   }, []);
 
@@ -341,16 +408,33 @@ export const Header = ({
             <MapPin className="w-4 h-4" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="px-2 text-sm">
-                  {loading ? 'جارٍ التحديد...' : cityName}
+                <Button variant="ghost" className="px-2 text-sm max-w-64 truncate" title={detailedAddress ? formatFullAddress(detailedAddress) : locationDisplay}>
+                  {loading ? 'جارٍ التحديد...' : locationDisplay}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={handleDetectLocation}>
-                  <LocateFixed className="w-4 h-4 mr-2" />
-                  استخدم موقعي الحالي
+              <DropdownMenuContent align="start" className="w-80">
+                <DropdownMenuItem onClick={handleDetectLocation} className="flex-col items-start p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <LocateFixed className="w-4 h-4" />
+                    <span className="font-medium">استخدم موقعي الحالي</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    سيتم تحديد عنوانك بدقة مع اسم الشارع والحي
+                  </span>
                 </DropdownMenuItem>
-                <hr className="my-1" />
+                
+                {detailedAddress && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="px-3 py-2">
+                      <div className="text-xs text-muted-foreground mb-1">العنوان الحالي:</div>
+                      <div className="text-sm font-medium">{formatFullAddress(detailedAddress)}</div>
+                    </div>
+                  </>
+                )}
+                
+                <DropdownMenuSeparator />
+                <div className="px-3 py-1 text-xs text-muted-foreground">أو اختر من المدن:</div>
                 {CITIES.map((city) => (
                   <DropdownMenuItem
                     key={city.name}

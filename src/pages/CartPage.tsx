@@ -12,6 +12,7 @@ import { BottomNav } from '@/components/store/BottomNav';
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import io from 'socket.io-client';
+import { Item } from '@radix-ui/react-context-menu';
 
 const CartPage = () => {
   const [cartItems, setCartItems] = useState<cart>();
@@ -279,6 +280,7 @@ const createOrder = async () => {
   };
 
   const deleteProduct = async (id: string) => {
+    console.log(id)
     try {
     // ✅ Call API to delete in backend
     const res = await fetch(`http://localhost:5000/api/cart/deletecart/${id}`, {
@@ -357,7 +359,7 @@ const createOrder = async () => {
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                               >
                                 <Minus className="h-4 w-4" />
                               </Button>

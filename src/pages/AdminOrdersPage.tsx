@@ -16,7 +16,9 @@ import {
   Eye,
   RefreshCw,
   AlertCircle,
-  Bell
+  Bell,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { useToast } from '@/hooks/use-toast';
@@ -64,9 +66,164 @@ const AdminOrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const { toast } = useToast();
 
-  // Get auth token from localStorage or context
+  // Request notification permission on component mount
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          setNotificationPermission(permission);
+        });
+      }
+    }
+  }, []);
+
+  // Play notification sound
+  const playNotificationSound = async () => {
+    if (!soundEnabled) return;
+    
+    try {
+      // Create audio context for better browser support
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Create a simple beep sound
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+      console.log('Audio notification failed:', error);
+    }
+  };
+
+  // Show browser notification
+  const showBrowserNotification = (title: string, body: string, icon?: string) => {
+    if (notificationPermission === 'granted') {
+      const notification = new Notification(title, {
+        body: body,
+        icon: icon || '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: 'new-order',
+        requireInteraction: true,
+        actions: [
+          {
+            action: 'view',
+            title: 'عرض الطلب'
+          },
+          {
+            action: 'dismiss',
+            title: 'تجاهل'
+          }
+        ]
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      // Auto close after 10 seconds
+      setTimeout(() => {
+        notification.close();
+      }, 10000);
+    }
+  };
+
+  // Make screen flash for visual notification
+  const flashScreen = () => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(59, 130, 246, 0.3);
+      z-index: 9999;
+      pointer-events: none;
+      animation: flash 0.5s ease-in-out;
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes flash {
+        0%, 100% { opacity: 0; }
+        50% { opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(overlay);
+    
+    setTimeout(() => {
+      document.body.removeChild(overlay);
+      document.head.removeChild(style);
+    }, 500);
+  };
+
+  // Vibrate device (mobile)
+  const vibrateDevice = () => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+  };
+
+  // Comprehensive notification function
+  const triggerNewOrderNotification = (order: Order) => {
+    const title = '🔔 طلب جديد!';
+    const body = `طلب جديد من ${order.user?.name || 'مستخدم'} - ${order.totalPrice.toFixed(2)} جنيه`;
+
+    // 1. Browser notification
+    showBrowserNotification(title, body);
+    
+    // 2. Sound notification
+    playNotificationSound();
+    
+    // 3. Visual flash
+    flashScreen();
+    
+    // 4. Device vibration (mobile)
+    vibrateDevice();
+    
+    // 5. Toast notification
+    toast({
+      title: title,
+      description: body,
+      duration: 8000,
+    });
+
+    // 6. Browser alert (as backup)
+    if (document.hidden) {
+      alert(`طلب جديد! ${body}`);
+    }
+
+    // 7. Change page title for attention
+    const originalTitle = document.title;
+    let blinkCount = 0;
+    const blinkInterval = setInterval(() => {
+      document.title = blinkCount % 2 === 0 ? '🔔 طلب جديد!' : originalTitle;
+      blinkCount++;
+      if (blinkCount >= 10) {
+        clearInterval(blinkInterval);
+        document.title = originalTitle;
+      }
+    }, 1000);
+  };
+
   const getAuthToken = () => {
     return localStorage.getItem('token');
   };
@@ -88,11 +245,8 @@ const AdminOrdersPage = () => {
         console.log('New order received:', newOrder);
         setOrders(prev => [newOrder, ...prev]);
         
-        toast({
-          title: '🔔 طلب جديد!',
-          description: `طلب جديد من ${newOrder.user?.name || 'مستخدم'} - ${newOrder.totalPrice.toFixed(2)} جنيه`,
-          duration: 5000,
-        });
+        // Trigger comprehensive notification
+        triggerNewOrderNotification(newOrder);
       });
 
       socketInstance.on('orderStatusUpdated', (updatedOrder: Order) => {
@@ -151,7 +305,7 @@ const AdminOrdersPage = () => {
         socketInstance.disconnect();
       };
     }
-  }, [toast]);
+  }, [toast, soundEnabled, notificationPermission]);
 
   // Fetch all orders
   const fetchOrders = async () => {
@@ -202,7 +356,6 @@ const AdminOrdersPage = () => {
         throw new Error('Failed to update order status');
       }
 
-      // Don't update local state here as Socket.IO will handle it
       toast({
         title: '✅ تم التحديث',
         description: 'تم تحديث حالة الطلب بنجاح',
@@ -220,7 +373,6 @@ const AdminOrdersPage = () => {
     }
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('ar-SA', {
       year: 'numeric',
@@ -231,7 +383,6 @@ const AdminOrdersPage = () => {
     });
   };
 
-  // Filter orders with null safety checks
   const filteredOrders = orders.filter(order => {
     const userName = order.user?.name || '';
     const storeName = order.store?.name || '';
@@ -276,7 +427,6 @@ const AdminOrdersPage = () => {
     }
   };
 
-  // Load orders on component mount
   useEffect(() => {
     fetchOrders();
   }, []);
@@ -295,12 +445,9 @@ const AdminOrdersPage = () => {
   return (
     <BaseLayout dir="rtl" className="bg-surface">
       <div className="flex min-h-screen">
-        {/* Add AdminSidebar component here if you have it */}
         <AdminSidebar />
         
-        {/* Main Content */}
         <main className="flex-1 overflow-auto">
-          {/* Header */}
           <div className="bg-white border-b border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -313,9 +460,40 @@ const AdminOrdersPage = () => {
                     متصل
                   </Badge>
                 )}
+                {notificationPermission === 'granted' && (
+                  <Badge className="bg-blue-100 text-blue-800">
+                    التنبيهات مفعلة
+                  </Badge>
+                )}
               </div>
               
               <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className={soundEnabled ? 'bg-green-50' : 'bg-gray-50'}
+                >
+                  {soundEnabled ? (
+                    <Volume2 className="h-4 w-4" />
+                  ) : (
+                    <VolumeX className="h-4 w-4" />
+                  )}
+                  <span className="mr-2">{soundEnabled ? 'الصوت مفعل' : 'الصوت مغلق'}</span>
+                </Button>
+                
+                {notificationPermission !== 'granted' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => Notification.requestPermission().then(setNotificationPermission)}
+                    className="text-orange-600 border-orange-200"
+                  >
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    تفعيل التنبيهات
+                  </Button>
+                )}
+                
                 <Button 
                   variant="outline" 
                   onClick={fetchOrders}
@@ -328,7 +506,6 @@ const AdminOrdersPage = () => {
               </div>
             </div>
             
-            {/* Search and Filter */}
             <div className="flex gap-4">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -357,7 +534,6 @@ const AdminOrdersPage = () => {
             </div>
           </div>
 
-          {/* Orders Content */}
           <div className="p-6">
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="space-y-4 p-4">
@@ -380,7 +556,6 @@ const AdminOrdersPage = () => {
                     
                     <CardContent>
                       <div className="grid md:grid-cols-2 gap-6">
-                        {/* Customer Info */}
                         <div>
                           <h4 className="font-medium mb-3 text-gray-900">معلومات العميل</h4>
                           <div className="space-y-2 text-sm">
@@ -398,20 +573,9 @@ const AdminOrdersPage = () => {
                               <MapPin className="h-4 w-4 text-gray-400 mt-1" />
                               <span>{order.deliveryAddress}</span>
                             </div>
-                            {order.user?.location && (
-                              <div className="flex items-center gap-2 text-gray-500">
-                                <span className="text-xs">الموقع المسجل:</span>
-                                <span className="text-xs">
-                                  {typeof order.user.location === 'string' 
-                                    ? order.user.location 
-                                    : 'موقع محدد'}
-                                </span>
-                              </div>
-                            )}
                           </div>
                         </div>
 
-                        {/* Order Items */}
                         <div>
                           <h4 className="font-medium mb-3 text-gray-900">المنتجات</h4>
                           <div className="space-y-2">
@@ -439,7 +603,6 @@ const AdminOrdersPage = () => {
                         </div>
                       </div>
 
-                      {/* Actions */}
                       <div className="flex gap-2 mt-6 pt-4 border-t">
                         <Button
                           variant="outline"
@@ -517,7 +680,6 @@ const AdminOrdersPage = () => {
         </main>        
       </div>
 
-      {/* Order Details Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">

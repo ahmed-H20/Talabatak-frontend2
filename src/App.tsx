@@ -25,6 +25,9 @@ import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 import { LocationProvider } from "./contexts/LocationContext";
 import AdminCouponsPage from "./pages/AdminCouponPage";
+import DeliveryRegistrationForm from "./pages/auth/delivaryRegPage";
+import DeliveryDashboard from "./pages/deliveryPage";
+import AdminDeliveryManagement from "./pages/AdminDelivaryDashboard";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +46,11 @@ const App = () => (
                 <CartPage />
               </ProtectedRoute>
             } />
+            <Route path="/deliveryDashboard" element={
+              // <ProtectedRoute allowedRoles={['delivery']}>
+                <DeliveryDashboard />
+              // </ProtectedRoute>
+            } />
             <Route path="/orders" element={
               <ProtectedRoute>
                 <OrdersPage />
@@ -55,6 +63,14 @@ const App = () => (
             } />
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/register" element={<RegisterPage />} />
+            <Route
+              path="/auth/register-delivery"
+              element={
+                <DeliveryRegistrationForm
+                  onSuccess={() => {}}
+                />
+              }
+            />
             <Route path="/auth/verify-phone" element={<VerifyPhonePage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
@@ -67,6 +83,7 @@ const App = () => (
             <Route path="/admin/locations" element={<AdminLocationsPage />} />
             <Route path="/admin/coupons" element={<AdminCouponsPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
+            <Route path="/admin/delivery" element={<AdminDeliveryManagement />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

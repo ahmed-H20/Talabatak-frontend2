@@ -82,116 +82,116 @@ class AuthService {
     return result;
   }
 
-  // Google Authentication
-  async googleAuth(): Promise<AuthResponse> {
-    return new Promise((resolve, reject) => {
-      // Load Google Sign-In API
-      if (!window.google) {
-        reject(new Error('Google Sign-In API not loaded'));
-        return;
-      }
+  // // Google Authentication
+  // async googleAuth(): Promise<AuthResponse> {
+  //   return new Promise((resolve, reject) => {
+  //     // Load Google Sign-In API
+  //     if (!window.google) {
+  //       reject(new Error('Google Sign-In API not loaded'));
+  //       return;
+  //     }
 
-      window.google.accounts.oauth2.initTokenClient({
-        client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID',
-        scope: 'email profile',
-        callback: async (response) => {
-          try {
-            if (response.error) {
-              reject(new Error(response.error));
-              return;
-            }
+  //     window.google.accounts.oauth2.initTokenClient({
+  //       client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID',
+  //       scope: 'email profile',
+  //       callback: async (response) => {
+  //         try {
+  //           if (response.error) {
+  //             reject(new Error(response.error));
+  //             return;
+  //           }
 
-            // Get user info from Google
-            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-              headers: {
-                Authorization: `Bearer ${response.access_token}`,
-              },
-            });
+  //           // Get user info from Google
+  //           const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+  //             headers: {
+  //               Authorization: `Bearer ${response.access_token}`,
+  //             },
+  //           });
 
-            const userInfo = await userInfoResponse.json();
+  //           const userInfo = await userInfoResponse.json();
 
-            // Send to backend
-            const authResponse = await fetch(`${API_BASE_URL}/auth/google`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                providerId: userInfo.id,
-                name: userInfo.name,
-                email: userInfo.email,
-                photo: userInfo.picture,
-              }),
-            });
+  //           // Send to backend
+  //           const authResponse = await fetch(`${API_BASE_URL}/auth/google`, {
+  //             method: 'POST',
+  //             headers: { 'Content-Type': 'application/json' },
+  //             body: JSON.stringify({
+  //               providerId: userInfo.id,
+  //               name: userInfo.name,
+  //               email: userInfo.email,
+  //               photo: userInfo.picture,
+  //             }),
+  //           });
 
-            if (!authResponse.ok) {
-              const error = await authResponse.json();
-              throw new Error(error.message || 'Google authentication failed');
-            }
+  //           if (!authResponse.ok) {
+  //             const error = await authResponse.json();
+  //             throw new Error(error.message || 'Google authentication failed');
+  //           }
 
-            const result = await authResponse.json();
+  //           const result = await authResponse.json();
             
-            if (result.token) {
-              localStorage.setItem('token', result.token);
-              localStorage.setItem('user', JSON.stringify(result.user));
-            }
+  //           if (result.token) {
+  //             localStorage.setItem('token', result.token);
+  //             localStorage.setItem('user', JSON.stringify(result.user));
+  //           }
             
-            resolve(result);
-          } catch (error) {
-            reject(error);
-          }
-        },
-      }).requestAccessToken();
-    });
-  }
+  //           resolve(result);
+  //         } catch (error) {
+  //           reject(error);
+  //         }
+  //       },
+  //     }).requestAccessToken();
+  //   });
+  // }
 
-  // Facebook Authentication
-  async facebookAuth(): Promise<AuthResponse> {
-    return new Promise((resolve, reject) => {
-      // Check if Facebook SDK is loaded
-      if (!window.FB) {
-        reject(new Error('Facebook SDK not loaded'));
-        return;
-      }
+  // // Facebook Authentication
+  // async facebookAuth(): Promise<AuthResponse> {
+  //   return new Promise((resolve, reject) => {
+  //     // Check if Facebook SDK is loaded
+  //     if (!window.FB) {
+  //       reject(new Error('Facebook SDK not loaded'));
+  //       return;
+  //     }
 
-      window.FB.login((response) => {
-        if (response.authResponse) {
-          // Get user info from Facebook
-          window.FB.api('/me', { fields: 'name,email,picture' }, async (userInfo) => {
-            try {
-              // Send to backend
-              const authResponse = await fetch(`${API_BASE_URL}/auth/facebook`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  providerId: userInfo.id,
-                  name: userInfo.name,
-                  email: userInfo.email,
-                  photo: userInfo.picture?.data?.url,
-                }),
-              });
+  //     window.FB.login((response) => {
+  //       if (response.authResponse) {
+  //         // Get user info from Facebook
+  //         window.FB.api('/me', { fields: 'name,email,picture' }, async (userInfo) => {
+  //           try {
+  //             // Send to backend
+  //             const authResponse = await fetch(`${API_BASE_URL}/auth/facebook`, {
+  //               method: 'POST',
+  //               headers: { 'Content-Type': 'application/json' },
+  //               body: JSON.stringify({
+  //                 providerId: userInfo.id,
+  //                 name: userInfo.name,
+  //                 email: userInfo.email,
+  //                 photo: userInfo.picture?.data?.url,
+  //               }),
+  //             });
 
-              if (!authResponse.ok) {
-                const error = await authResponse.json();
-                throw new Error(error.message || 'Facebook authentication failed');
-              }
+  //             if (!authResponse.ok) {
+  //               const error = await authResponse.json();
+  //               throw new Error(error.message || 'Facebook authentication failed');
+  //             }
 
-              const result = await authResponse.json();
+  //             const result = await authResponse.json();
               
-              if (result.token) {
-                localStorage.setItem('token', result.token);
-                localStorage.setItem('user', JSON.stringify(result.user));
-              }
+  //             if (result.token) {
+  //               localStorage.setItem('token', result.token);
+  //               localStorage.setItem('user', JSON.stringify(result.user));
+  //             }
               
-              resolve(result);
-            } catch (error) {
-              reject(error);
-            }
-          });
-        } else {
-          reject(new Error('Facebook login cancelled'));
-        }
-      }, { scope: 'email' });
-    });
-  }
+  //             resolve(result);
+  //           } catch (error) {
+  //             reject(error);
+  //           }
+  //         });
+  //       } else {
+  //         reject(new Error('Facebook login cancelled'));
+  //       }
+  //     }, { scope: 'email' });
+  //   });
+  // }
 
   // Complete social profile (for new social users)
   async completeSocialProfile(data: {
@@ -240,7 +240,7 @@ class AuthService {
     if (result.token) {
       localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
-    }
+    }    
     return result;
   }
 
@@ -313,7 +313,7 @@ class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('token');
+    return localStorage.getItem('token') ? true : false ;
   }
 }
 

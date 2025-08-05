@@ -87,9 +87,9 @@ export const ProductCard = ({
       !product.inStock && 'opacity-75',
       className
     )}>
-      <CardContent className="p-4">
+      <CardContent className="p-4 flex flex-col h-full">
         {/* Image and Badges */}
-        <div className="relative mb-4">
+        <div className="relative mb-4 h-full">
           <div className="aspect-square bg-muted rounded-lg overflow-hidden">
             {!imageError ? (
               <img
@@ -200,7 +200,7 @@ export const ProductCard = ({
             </span>
             {product.originalPrice && product.originalPrice > product.price && (
               <span className="text-sm text-muted-foreground line-through">
-                {product.originalPrice.toLocaleString('ar-SA')} ر.س
+                {product.originalPrice.toFixed(0)} ر.س
               </span>
             )}
             <span className="text-xs text-muted-foreground">

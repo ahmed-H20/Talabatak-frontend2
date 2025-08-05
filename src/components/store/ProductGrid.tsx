@@ -113,7 +113,7 @@ const ProductCard: React.FC<{
   };
 
   return (
-    <div className="bg-card rounded-lg border overflow-hidden hover:shadow-lg transition-shadow">
+     <div className="bg-card rounded-lg border overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
       {/* Product Image */}
       <div className="relative aspect-square overflow-hidden">
         <img
@@ -121,14 +121,14 @@ const ProductCard: React.FC<{
           alt={product.name}
           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
         />
-        
+
         {/* Discount Badge */}
         {product.discount > 0 && (
           <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
             -{product.discount}%
           </div>
         )}
-        
+
         {/* Favorite Button */}
         <button
           onClick={handleToggleFavorite}
@@ -141,8 +141,8 @@ const ProductCard: React.FC<{
             )}
           />
         </button>
-        
-        {/* Stock Status */}
+
+        {/* Out of Stock Overlay */}
         {!product.inStock && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <span className="text-white font-medium">غير متوفر</span>
@@ -150,72 +150,76 @@ const ProductCard: React.FC<{
         )}
       </div>
 
-      {/* Product Info */}
-      <div className="p-3 space-y-2">
-        {/* Product Name */}
-        <h3 className="font-medium text-sm line-clamp-2 min-h-[2.5rem]">
-          {product.name}
-        </h3>
-        <h4 className="font-small text-sm line-clamp-2 min-h-[0.5rem]">
-          متجر {product.storeName}
-        </h4>
-        {/* Store Info */}
-        <div className="flex items-center text-xs text-muted-foreground">
-          <span></span>
-          <span>{product.store.name}</span>
-          <span className="mx-1">•</span>
-          <span>{product.store.distance.toFixed(2)} كم</span>
-        </div>
-        
-        {/* Rating */}
-        <div className="flex items-center gap-1">
-          <div className="flex items-center">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star
-                key={i}
-                className={cn(
-                  "h-3 w-3",
-                  i < Math.floor(product.rating)
-                    ? "fill-yellow-400 text-yellow-400"
-                    : "text-gray-300"
-                )}
-              />
-            ))}
+      {/* Product Info + Button */}
+      <div className="p-3 flex flex-col flex-grow justify-between">
+        {/* Top Section */}
+        <div className="space-y-2">
+          <h3 className="font-medium text-sm line-clamp-2 min-h-[2.5rem]">
+            {product.name}
+          </h3>
+          <h4 className="font-small text-sm line-clamp-2 min-h-[0.5rem]">
+            متجر {product.storeName}
+          </h4>
+
+          {/* Store Info */}
+          <div className="flex items-center text-xs text-muted-foreground">
+            <span>{product.store.name}</span>
+            {product.store?.distance && (
+              <>
+                <span className="mx-1">•</span>
+                <span>{product.store.distance.toFixed(2)} كم</span>
+              </>
+            )}
           </div>
-          <span className="text-xs text-muted-foreground">
-            ({product.reviewCount})
-          </span>
-        </div>
-        
-        {/* Price */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
+
+          {/* Rating */}
+          <div className="flex items-center gap-1">
+            <div className="flex items-center">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={cn(
+                    "h-3 w-3",
+                    i < Math.floor(product.rating)
+                      ? "fill-yellow-400 text-yellow-400"
+                      : "text-gray-300"
+                  )}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              ({product.reviewCount})
+            </span>
+          </div>
+
+          {/* Price */}
+          <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-primary">
                 {product.discountedPrice} ج.م
               </span>
-              <span className="text-xs text-muted-foreground">
-                /{product.unit}
-              </span>
+              <span className="text-xs text-muted-foreground">/{product.unit}</span>
             </div>
             {product.discount > 0 && (
               <div className="text-xs text-muted-foreground line-through">
-                {product.price} ج.م
+                {product.price.toFixed(2)} ج.م
               </div>
             )}
           </div>
         </div>
-        
-        {/* Add to Cart Button */}
-        <Button
-          onClick={onAddToCart}
-          disabled={!product.inStock}
-          size="sm"
-          className="w-full"
-        >
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          إضافة للسلة
-        </Button>
+
+        {/* Bottom Section: Add to Cart Button */}
+        <div className="mt-4">
+          <Button
+            onClick={onAddToCart}
+            disabled={!product.inStock}
+            size="sm"
+            className="w-full flex"
+          >
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            إضافة للسلة
+          </Button>
+        </div>
       </div>
     </div>
   );
