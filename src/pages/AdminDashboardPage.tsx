@@ -118,14 +118,7 @@ const AdminDashboardPage = () => {
     try {
       setError(null);
       
-      // Check admin authentication
-      const adminToken = localStorage.getItem('token');
-      if (!adminToken) {
-        window.location.href = '/admin/login';
-        return;
-      }
-
-      // Load data from APIs
+            // Load data from APIs
       const [ordersRes, productsRes, storesRes, categoriesRes] = await Promise.all([
         apiService.getOrders().catch(err => ({ error: err.message, data: [] })),
         apiService.getProducts().catch(err => ({ error: err.message, data: [] })),
