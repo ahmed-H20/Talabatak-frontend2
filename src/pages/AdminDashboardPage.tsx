@@ -18,7 +18,7 @@ import { BaseLayout } from '@/components/layout/BaseLayout';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
 
 // API Service Functions
 const apiService = {
@@ -188,7 +188,7 @@ const AdminDashboardPage = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/admin/login';
+    window.location.href = '/auth/login';
   };
 
   const getStatusIcon = (status) => {

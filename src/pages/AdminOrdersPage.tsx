@@ -183,15 +183,15 @@ const AdminOrdersPage = () => {
   };
 
   // Comprehensive notification function
-  const triggerNewOrderNotification = (order: Order) => {
+  const triggerNewOrderNotification = async(order: Order) => {
     const title = '🔔 طلب جديد!';
     const body = `طلب جديد من ${order.user?.name || 'مستخدم'} - ${order.totalPrice.toFixed(2)} جنيه`;
 
+    // 2. Sound notification
+    await playNotificationSound();
+
     // 1. Browser notification
     showBrowserNotification(title, body);
-    
-    // 2. Sound notification
-    playNotificationSound();
     
     // 3. Visual flash
     flashScreen();
@@ -232,7 +232,7 @@ const AdminOrdersPage = () => {
   useEffect(() => {
     const token = getAuthToken();
     if (token) {
-      const socketInstance = io('http://localhost:5000', {
+      const socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
         auth: {
           token: token
         }
@@ -293,12 +293,12 @@ const AdminOrdersPage = () => {
 
       socketInstance.on('disconnect', () => {
         console.log('Disconnected from Socket.IO server');
-        toast({
-          title: '⚠️ انقطع الاتصال',
-          description: 'انقطع الاتصال بالخادم - جاري المحاولة للاتصال مرة أخرى',
-          variant: 'destructive',
-          duration: 3000,
-        });
+        // toast({
+        //   title: '⚠️ انقطع الاتصال',
+        //   description: 'انقطع الاتصال بالخادم - جاري المحاولة للاتصال مرة أخرى',
+        //   variant: 'destructive',
+        //   duration: 3000,
+        // });
       });
 
       return () => {
@@ -312,7 +312,7 @@ const AdminOrdersPage = () => {
     try {
       setLoading(true);
       const token = getAuthToken();
-      const response = await fetch('http://localhost:5000/api/orders/all', {
+      const response = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/all', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -343,7 +343,7 @@ const AdminOrdersPage = () => {
       setUpdatingStatus(orderId);
       const token = getAuthToken();
       
-      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -468,6 +468,7 @@ const AdminOrdersPage = () => {
               </div>
               
               <div className="flex gap-3">
+                <button onClick={playNotificationSound}>TEST SOUND </button>
                 <Button
                   variant="outline"
                   size="sm"

@@ -28,8 +28,11 @@ import AdminCouponsPage from "./pages/AdminCouponPage";
 import DeliveryRegistrationForm from "./pages/auth/delivaryRegPage";
 import DeliveryDashboard from "./pages/deliveryPage";
 import AdminDeliveryManagement from "./pages/AdminDelivaryDashboard";
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import ProductForm from '@/pages/ProductForm'
 
 const queryClient = new QueryClient();
+const clientId = "599763874700-ma2che296dum9ktpadcirtdktdke3j32.apps.googleusercontent.com"
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -39,7 +42,13 @@ const App = () => (
         <Sonner />
         <LocationProvider>
         <BrowserRouter>
+        <GoogleOAuthProvider clientId={clientId} >
           <Routes>
+            <Route path="product-test" element={<ProductForm onSuccess stores = {[]} categories = {[]} subCategories = {[]}/>}/>
+            <Route path="/auth/verify-phone" element={<VerifyPhonePage />} />
+            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/" element={<StorePage />} />
             <Route path="/cart" element={
               <ProtectedRoute>
@@ -70,11 +79,7 @@ const App = () => (
                   onSuccess={() => {}}
                 />
               }
-            />
-            <Route path="/auth/verify-phone" element={<VerifyPhonePage />} />
-            <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
+            />            
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/orders" element={<AdminOrdersPage />} />
             <Route path="/admin/products" element={<AdminProductsPage />} />
@@ -87,6 +92,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </GoogleOAuthProvider>
         </BrowserRouter>
         </LocationProvider>
       </TooltipProvider>

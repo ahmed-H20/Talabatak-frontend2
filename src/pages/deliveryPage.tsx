@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 // API configuration
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
 
 // Mock data for fallback
 const mockData = {
@@ -44,7 +44,7 @@ const mockData = {
         location: { coordinates: [31.2357, 30.0444] }
       },
       totalPrice: 185,
-      deliveryFee: 25,
+      deliveryFee: 30,
       deliveryAddress: 'شارع التحرير، الدقي، الجيزة، مصر',
       status: 'ready_for_pickup',
       createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
@@ -58,7 +58,7 @@ const mockData = {
         location: { coordinates: [31.2400, 30.0500] }
       },
       totalPrice: 95,
-      deliveryFee: 15,
+      deliveryFee: 30,
       deliveryAddress: 'شارع النيل، المعادي، القاهرة، مصر',
       status: 'ready_for_pickup',
       createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
@@ -72,7 +72,7 @@ const mockData = {
         location: { coordinates: [31.2300, 30.0600] }
       },
       totalPrice: 320,
-      deliveryFee: 35,
+      deliveryFee: 30,
       deliveryAddress: 'مدينة نصر، القاहرة الجديدة، القاهرة، مصر',
       status: 'ready_for_pickup',
       createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
@@ -102,7 +102,7 @@ const mockData = {
         location: { coordinates: [31.2200, 30.0700] }
       },
       totalPrice: 150,
-      deliveryFee: 20,
+      deliveryFee: 30,
       deliveryAddress: 'مصر الجديدة، القاهرة، مصر',
       status: 'on_the_way',
       createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),

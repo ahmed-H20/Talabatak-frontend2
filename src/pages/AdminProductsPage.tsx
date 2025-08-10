@@ -591,7 +591,7 @@ import { BaseLayout } from '@/components/layout/BaseLayout';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
 
 // API Service with proper backend integration
 const apiService = {
@@ -920,7 +920,7 @@ const AdminProductsPage = () => {
           discountedPrice: 23.39,
           store: { name: 'متجر تجريبي' },
           category: { name: 'فئة تجريبية' },
-          images: [{ url: '📦' }]
+          images: ['📦']
         }
       ]);
     } finally {
@@ -1446,7 +1446,9 @@ const AdminProductsPage = () => {
       </div>
       
       {/* Image Upload Section */}
-      <div className="space-y-4">
+      {
+        !editingProduct? 
+        <div className="space-y-4">
         <Label htmlFor="images">صور المنتج</Label>
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
           <div className="text-center">
@@ -1473,7 +1475,7 @@ const AdminProductsPage = () => {
         </div>
         
         {/* Image Preview */}
-      {formData.images.map((image, index) => {
+      {formData.images.map((image = [], index) => {
         const imageUrl = image instanceof File ? URL.createObjectURL(image) : image;
 
         return (
@@ -1495,6 +1497,9 @@ const AdminProductsPage = () => {
       })}
 
       </div>
+      :
+      <></>
+      }
       
       <div className="flex gap-2 pt-4">
         <Button 
@@ -1577,7 +1582,7 @@ const AdminProductsPage = () => {
                       <tr key={product._id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="p-4">
                           <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl">
-                            {product.images?.[0]?.url || '📦'}
+                            {product.images[0] ? <img src={product.images[0]} alt="Product image" /> : '📦'}
                           </div>
                         </td>
                         <td className="p-4">

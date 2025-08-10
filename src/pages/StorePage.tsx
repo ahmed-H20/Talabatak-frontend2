@@ -96,7 +96,7 @@ const StorePage = () => {
       setError(null);
       
       const response = await fetch(
-        `http://localhost:5000/api/stores/nearby?lat=${location.lat}&lng=${location.lon}`,
+        `https://talabatak-backend2-zw4i.onrender.com/api/stores/nearby?lat=${location.lat}&lng=${location.lon}`,
         {
           method: 'GET',
           headers: {
@@ -160,7 +160,7 @@ const StorePage = () => {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/categories`, {
+      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/categories`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -202,7 +202,7 @@ const StorePage = () => {
     if (!token) return; // Don't fetch cart if user is not authenticated
 
     try {
-      const response = await fetch(`http://localhost:5000/api/cart/cartUser`, {
+      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/cartUser`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -234,7 +234,7 @@ const StorePage = () => {
     }
     try {
         setLoading(true);
-        const response = await fetch(`http://localhost:5000/api/cart/addCartItem`, {
+        const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/addCartItem`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -289,7 +289,7 @@ const StorePage = () => {
     // TODO: Add API call to update favorites on server
     if (token) {
       try {
-        await fetch(`http://localhost:5000/api/favorites/${product._id}`, {
+        await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/favorites/${product._id}`, {
           method: isFavorite ? 'DELETE' : 'POST',
           headers: {
             'Content-Type': 'application/json',

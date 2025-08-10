@@ -107,7 +107,7 @@ const OrdersPage = () => {
   // Initialize Socket.IO connection
   useEffect(() => {
     if (token) {
-      const socketInstance = io('http://localhost:5000', {
+      const socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
         auth: {
           token: token
         }
@@ -184,7 +184,7 @@ const OrdersPage = () => {
           title: '⚠️ انقطع الاتصال',
           description: 'انقطع الاتصال بالخادم',
           variant: 'destructive',
-          duration: 3000,
+          duration: 500,
         });
       });
 
@@ -207,7 +207,7 @@ const OrdersPage = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/orders/', {
+      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -239,7 +239,7 @@ const OrdersPage = () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/cancel`, {
+      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/cancel`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -275,13 +275,14 @@ const OrdersPage = () => {
   };
 
   // Update order function (for demonstration - you might want to implement a modal with form)
-  const updateOrder = async (orderId: string) => {
+  const updateOrder = async (orderId: string, order: Order) => {
+    console.log(order)
     // This is a basic example - you might want to implement a proper form/modal
     const newAddress = window.prompt('أدخل عنوان التسليم الجديد:');
     if (!newAddress) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/update`, {
+      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/update`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -289,6 +290,7 @@ const OrdersPage = () => {
         },
         body: JSON.stringify({
           deliveryAddress: newAddress,
+          orderItems: order.orderItems
         }),
       });
 
@@ -459,15 +461,15 @@ const OrdersPage = () => {
                         {/* Action buttons for pending orders */}
                         {canModifyOrder(order.status) && (
                           <div className="flex gap-1">
-                            <Button
+                            {/* <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => updateOrder(order._id)}
+                              onClick={() => updateOrder(order._id, order)}
                               className="h-8 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
                               title="تعديل الطلب"
                             >
                               <Edit className="h-3 w-3" />
-                            </Button>
+                            </Button> */}
                             <Button
                               size="sm"
                               variant="outline"

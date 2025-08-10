@@ -219,7 +219,9 @@ export const Header = ({
       const address = JSON.parse(storedDetailedAddress);
       setDetailedAddress(address);
       setLocationDisplay(formatAddressForDisplay(address));
+      localStorage.setItem("FormatAdd" , locationDisplay)
     }
+    
   }, []);
 
   const handleLogout = async () => {

@@ -64,7 +64,7 @@ const AdminCouponsPage = () => {
   // Fetch coupons
   const fetchCoupons = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/coupons/getCoupons', {
+      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/coupons/getCoupons', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -87,7 +87,7 @@ const AdminCouponsPage = () => {
   // Fetch stores
   const fetchStores = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/stores', {
+      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/stores', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -117,8 +117,8 @@ const AdminCouponsPage = () => {
     
     try {
       const url = editingCoupon 
-        ? `http://localhost:5000/api/coupons/update/${editingCoupon.id}`
-        : 'http://localhost:5000/api/coupons/create';
+        ? `https://talabatak-backend2-zw4i.onrender.com/api/coupons/update/${editingCoupon.id}`
+        : 'https://talabatak-backend2-zw4i.onrender.com/api/coupons/create';
       
       const method = editingCoupon ? 'PUT' : 'POST';
       
@@ -161,7 +161,7 @@ const AdminCouponsPage = () => {
       stores: coupon.stores.map(store => store._id) || [],
       usageLimit: coupon.usageLimit,
       allStores: coupon.allStores,
-      usedBy: coupon.usedBy.map(user => user._id),
+      usedBy: coupon?.usedBy.map(user => user?._id) || [],
       allUsers: coupon.allUsers
     });
     console.log(formData);
@@ -170,7 +170,7 @@ const AdminCouponsPage = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/coupons/delete/${id}`, {
+      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/coupons/delete/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

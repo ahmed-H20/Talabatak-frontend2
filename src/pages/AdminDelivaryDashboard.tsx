@@ -42,7 +42,7 @@ const AdminDeliveryManagement = () => {
 
   // API call helper
   const apiCall = async (url, options = {}) => {
-    const response = await fetch(`http://localhost:5000/api${url}`, {
+    const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api${url}`, {
       headers: {
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -313,8 +313,8 @@ const AdminDeliveryManagement = () => {
                     </CardContent>
                   </Card>
                 ) : (
-                  filteredApplications.map((application) => (
-                    <Card key={application._id} className="shadow-sm">
+                  filteredApplications.map((application, index) => (
+                    <Card key={index} className="shadow-sm">
                       <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -353,7 +353,11 @@ const AdminDeliveryManagement = () => {
                               <div className="flex items-start gap-2">
                                 <MapPin className="h-4 w-4 text-gray-400 mt-1" />
                                 <span className="font-medium">العنوان:</span>
-                                <span className="flex-1">{application.location}</span>
+                                <span>
+                                  {application.location?.coordinates
+                                    ? application.location.coordinates.join(", ")
+                                    : "No location"}
+                                </span>
                               </div>
                             </div>
                           </div>

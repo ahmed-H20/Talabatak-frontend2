@@ -16,7 +16,7 @@ import { Item } from '@radix-ui/react-context-menu';
 
 const CartPage = () => {
   const [cartItems, setCartItems] = useState<cart>();
-  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState(localStorage.getItem("FormatAdd") || "");
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [socket, setSocket] = useState(null);
 
@@ -54,7 +54,7 @@ const CartPage = () => {
   // Initialize Socket.IO connection
   useEffect(() => {
     if (user && token) {
-      const socketConnection = io('http://localhost:5000', {
+      const socketConnection = io('https://talabatak-backend2-zw4i.onrender.com', {
         auth: {
           token: token
         }
@@ -131,7 +131,7 @@ const createOrder = async () => {
 
     console.log('Creating order with data:', orderData);
 
-    const response = await fetch('http://localhost:5000/api/orders/', {
+    const response = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -177,7 +177,7 @@ const createOrder = async () => {
 
     try {
       setIsApplying(true);
-      const res = await fetch(`http://localhost:5000/api/coupons/useCoupon`, {
+      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/coupons/useCoupon`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -205,8 +205,9 @@ const createOrder = async () => {
   };
   
   const fetchCart = async () => {
+    
     try {
-      const response = await fetch(`http://localhost:5000/api/cart/cartUser`, {
+      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/cartUser`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -256,7 +257,7 @@ const createOrder = async () => {
 
   try {
     // ✅ Call API to update quantity in backend
-    const res = await fetch(`http://localhost:5000/api/cart/updateCartItem/${id}`, {
+    const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/updateCartItem/${id}`, {
       method:  "PUT",
       headers: { 
         "Content-Type": "application/json" ,
@@ -283,7 +284,7 @@ const createOrder = async () => {
     console.log(id)
     try {
     // ✅ Call API to delete in backend
-    const res = await fetch(`http://localhost:5000/api/cart/deletecart/${id}`, {
+    const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/deletecart/${id}`, {
       method:  "DELETE",
       headers: { 
         "Content-Type": "application/json" ,
@@ -351,7 +352,7 @@ const createOrder = async () => {
                         <div className="flex-1">
                           <h3 className="font-medium mb-1">{item.product.name}</h3>
                           <p className="text-primary font-semibold ml-2">
-                            {item.price} ر.س / {item.product?.unit}
+                            {item.price} ر.س / {item.product?.unit || "كيلو"}
                           </p>
                           <div className="flex items-center gap-3 mt-2">
                             <div className="flex items-center gap-2">
@@ -359,7 +360,7 @@ const createOrder = async () => {
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
                               >
                                 <Minus className="h-4 w-4" />
                               </Button>
