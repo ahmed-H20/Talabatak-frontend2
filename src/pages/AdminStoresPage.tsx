@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Edit, Trash2, MapPin, Phone, Clock, Eye, Truck, Package, ArrowRight } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMapEvents ,Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -22,16 +22,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
 const LocationSelector = ({ onSelect }: { onSelect: (lat: number, lng: number) => void }) => {
@@ -52,10 +42,7 @@ const LocationMarker = ({ setFormData }: { setFormData }) => {
         ...prev,
         location: {
           ...prev.location,
-          coordinates: {
-            lat,
-            lng,
-          },
+          coordinates: [lng, lat], // GeoJSON format: [longitude, latitude]
         },
       }));
     },
@@ -70,35 +57,18 @@ interface WorkingHours {
   isClosed: boolean;
 }
 
-// interface Store {
-//   id: string;
-//   name: string;
-//   description: string;
-//   address: string;
-//   phone: string;
-//   deliveryRange: string;
-//   productCount: number;
-//   isActive: boolean;
-//   location: {
-//     lat: number;
-//     lng: number;
-//   };
-//   workingHours: WorkingHours[];
-//   products: Product[];
-// }
-
 interface Store {
   _id: string;
   name: string;
   description: string;
   phone: string;
-  workingHours: WorkingHours[]
+  workingHours: WorkingHours[];
   isOpen: boolean;
   location: {
-    coordinates: { lat: number; lng: number };
+    coordinates: [number, number]; // GeoJSON format: [longitude, latitude]
     address?: string;
   };
-  products: Product []
+  products: Product[];
   city?: string;
   deliveryRangeKm?: number; // in km
 }
@@ -116,8 +86,10 @@ interface Product {
   image?: string;
 }
 
- const getCityNameFromCoordinates = async (lat: number, lng: number): Promise<string | null> => {
+const getCityNameFromCoordinates = async (coordinates: [number, number]): Promise<string | null> => {
   try {
+    // coordinates is [longitude, latitude] in GeoJSON format
+    const [lng, lat] = coordinates;
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
     );
@@ -125,12 +97,12 @@ interface Product {
     if (!response.ok) throw new Error("Failed to fetch city name");
 
     const data = await response.json();
-    const city : string =
+    const city: string =
       data.address?.city ||
       data.address?.town ||
       data.address?.village ||
       data.address?.state ||
-      data.address?.county || ''
+      data.address?.county || '';
 
     return city || "فشل ايجاد المدينة";
   } catch (error) {
@@ -138,7 +110,6 @@ interface Product {
     return "فشل ايجاد المدينة";
   }
 };
-
 
 const AdminStoresPage = () => {
   const { toast } = useToast();
@@ -151,12 +122,10 @@ const AdminStoresPage = () => {
       isOpen: true,
       city: "القاهرة",
       location: { 
-        address:'',
-        coordinates: {
-          lat: 30.0444, lng: 31.2357
-        }
-       },
-        workingHours: [
+        address: '',
+        coordinates: [31.2357, 30.0444] // [longitude, latitude]
+      },
+      workingHours: [
         { day: 'Saturday', open: '09:00', close: '22:00', isClosed: false },
         { day: 'Sunday', open: '09:00', close: '22:00', isClosed: false },
         { day: 'Monday', open: '09:00', close: '22:00', isClosed: false },
@@ -193,10 +162,8 @@ const AdminStoresPage = () => {
     isOpen: true,
     city: '',
     location: { 
-        address:'',
-        coordinates: {
-          lat: 30.0444, lng: 31.2357
-        }
+      address: '',
+      coordinates: [31.2357, 30.0444] as [number, number] // [longitude, latitude]
     },
     workingHours: [
       { day: 'Saturday', open: '09:00', close: '22:00', isClosed: false },
@@ -207,85 +174,99 @@ const AdminStoresPage = () => {
       { day: 'Thursday', open: '09:00', close: '22:00', isClosed: false },
       { day: 'Friday', open: '09:00', close: '22:00', isClosed: false },
     ]
-
   });
-  const token = localStorage.getItem("token")
+  
+  const token = localStorage.getItem("token");
 
   const fetchStores = async () => {
-        try {
-            const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/stores',{
-                headers: {
-                    'Content-Type': 'application/json',                    
-                      ...(token && { Authorization: `Bearer ${token}` }),
-                },
-            });
-            const data = await res.json();
-            setStores(data.data);
-        } catch (error) {
-        toast({ title: 'فشل في تحميل المتاجر', description: String(error) });
-        }
-    };
+    try {
+      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/stores', {
+        headers: {
+          'Content-Type': 'application/json',                    
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      const data = await res.json();
+      setStores(data.data);
+    } catch (error) {
+      toast({ title: 'فشل في تحميل المتاجر', description: String(error) });
+    }
+  };
 
-  //Fetsh stores
+  //Fetch stores
   useEffect(() => {
     fetchStores();
   }, []);
 
-  console.log(stores)
+  console.log(stores);
 
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.location.address.toLowerCase().includes(searchTerm.toLowerCase())
+    (store.location.address && store.location.address.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleSubmit = async(e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(formData)
+    console.log(formData);
     if (editingStore) {
-     try {
+      try {
         const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores/${editingStore._id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token && { Authorization: `Bearer ${token}` }),
-            },
-            body: JSON.stringify({...formData, city: await getCityNameFromCoordinates(formData.location.coordinates.lat, formData.location.coordinates.lng)}),
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify({
+            ...formData, 
+            city: await getCityNameFromCoordinates(formData.location.coordinates),
+            location: {
+              ...formData.location,
+              type: 'Point' // Required for GeoJSON
+            }
+          }),
         });
-        if(!res){
+        if (!res.ok) {
           console.log("Store not updated");
         }
         const data = await res.json();
         console.log("Store updated successfully", data);
-        toast({ title: 'تم تحديث المتجر'});
+        toast({ title: 'تم تحديث المتجر' });
         setIsDialogOpen(false);
-        fetchStores()
+        fetchStores();
         setEditingStore(null);               
       }
       catch (error) {
-          toast({ title: 'فشل في تحديث المتجر', description: String(error) });
+        toast({ title: 'فشل في تحديث المتجر', description: String(error) });
       }
     } else {
       try {
         const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token && { Authorization: `Bearer ${token}` }),
-            },
-            body: JSON.stringify({...formData, city: await getCityNameFromCoordinates(formData.location.coordinates.lat, formData.location.coordinates.lng)}),
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify({
+            ...formData, 
+            city: await getCityNameFromCoordinates(formData.location.coordinates),
+            location: {
+              ...formData.location,
+              type: 'Point' // Required for GeoJSON
+            }
+          }),
         });
-        if(!res){
+        if (!res.ok) {
           console.log("Store not Created");
         }
         const data = await res.json();
-        console.log("Store updated successfully", data);
-        toast({ title: 'تم اضافة المتجر'});
+        console.log("Store created successfully", data);
+        toast({ title: 'تم اضافة المتجر' });
         setIsDialogOpen(false);
-        fetchStores()
+        fetchStores();
         setEditingStore(null);               
       }
       catch (error) {
-          toast({ title: 'فشل في تحديث المتجر', description: String(error) });
+        toast({ title: 'فشل في اضافة المتجر', description: String(error) });
       }
     }
     
@@ -300,11 +281,11 @@ const AdminStoresPage = () => {
       description: '',
       phone: '',
       deliveryRangeKm: 0,
-      city:'',
+      city: '',
       isOpen: true,
       location: {
-        coordinates:{ lat: 30.0444, lng: 31.2357 },
-        address:''
+        coordinates: [31.2357, 30.0444], // [longitude, latitude]
+        address: ''
       },
       workingHours: [
         { day: 'Saturday', open: '09:00', close: '22:00', isClosed: false },
@@ -318,22 +299,19 @@ const AdminStoresPage = () => {
     });
   };
 
-  const handleEdit = async(store: Store) => {
-    const cityName = await getCityNameFromCoordinates(store.location.coordinates.lat, store.location.coordinates.lng)
+  const handleEdit = async (store: Store) => {
+    const cityName = await getCityNameFromCoordinates(store.location.coordinates);
     setEditingStore(store);
     setFormData({
       name: store.name,
       description: store.description,
       phone: store.phone,
-      deliveryRangeKm: store.deliveryRangeKm,
+      deliveryRangeKm: store.deliveryRangeKm || 0,
       isOpen: store.isOpen,
       city: cityName || '',
       location: {
-        coordinates:{
-          lat: store.location.coordinates.lat,
-          lng: store.location.coordinates.lng,
-        },
-        address:store.location.address,
+        coordinates: store.location.coordinates,
+        address: store.location.address || '',
       },
       workingHours: store.workingHours
     });    
@@ -376,8 +354,11 @@ const AdminStoresPage = () => {
   };
 
   if (viewMode === 'detail' && selectedStore) {
+    // Convert coordinates to lat/lng for display
+    const [lng, lat] = selectedStore.location.coordinates; // GeoJSON format
+    
     return (
-    <BaseLayout dir="rtl" className="bg-surface">
+      <BaseLayout dir="rtl" className="bg-surface">
         <div className="flex min-h-screen">
           <AdminSidebar />
           
@@ -440,7 +421,7 @@ const AdminStoresPage = () => {
                       
                       <div className="flex items-center gap-2">
                         <Truck className="h-4 w-4 text-muted-foreground" />
-                        <span>نطاق التوصيل: {selectedStore.deliveryRangeKm}</span>
+                        <span>نطاق التوصيل: {selectedStore.deliveryRangeKm} كم</span>
                       </div>
                       
                       <div className="flex items-center gap-2">
@@ -450,36 +431,28 @@ const AdminStoresPage = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Map Placeholder */}
+                  {/* Map */}
                   <Card>
                     <CardHeader>
                       <CardTitle>موقع المتجر على الخريطة</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {/* <div className="h-64 bg-muted rounded-lg flex items-center justify-center"> */}
-                        {/* <div className="text-center"> */}
-                          {/* <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground" /> */}
-                          {/* <p className="text-muted-foreground">خريطة الموقع</p> */}
-                          <MapContainer className='h-64 bg-muted rounded-lg flex items-center justify-center'
-                            center={[selectedStore.location.coordinates.lat, selectedStore.location.coordinates.lng]} // latitude, longitude
-                            zoom={13}
-                            style={{ height: '400px', width: '100%', marginTop: '1rem' }}
-                          >
-                            <TileLayer
-                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                              attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-                            />
-                            <Marker position={[selectedStore.location.coordinates.lat, selectedStore.location.coordinates.lng]}>
-                              <Popup>
-                                موقع المتجر 
-                              </Popup>
-                            </Marker>
-                          </MapContainer>
-                          {/* <p className="text-sm text-muted-foreground">
-                            {selectedStore.location.coordinates.lat}, {selectedStore.location.coordinates.lng}
-                          </p> */}
-                        {/* </div> */}
-                      {/* </div> */}
+                      <MapContainer 
+                        className='h-64 bg-muted rounded-lg flex items-center justify-center'
+                        center={[lat, lng]} // Leaflet expects [latitude, longitude]
+                        zoom={13}
+                        style={{ height: '400px', width: '100%', marginTop: '1rem' }}
+                      >
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+                        />
+                        <Marker position={[lat, lng]}>
+                          <Popup>
+                            موقع المتجر 
+                          </Popup>
+                        </Marker>
+                      </MapContainer>
                     </CardContent>
                   </Card>
 
@@ -499,12 +472,12 @@ const AdminStoresPage = () => {
                               <TableHead>الفئة الفرعية</TableHead>
                               <TableHead>السعر</TableHead>
                               <TableHead>الكمية</TableHead>
-                              <TableCell> % نسبة الخصم </TableCell>
-                              <TableCell>السعر بعد الخصم</TableCell>
+                              <TableHead>% نسبة الخصم</TableHead>
+                              <TableHead>السعر بعد الخصم</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {selectedStore.products.map((product,index) => (
+                            {selectedStore.products.map((product, index) => (
                               <TableRow key={index}>
                                 <TableCell>
                                   <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
@@ -515,16 +488,6 @@ const AdminStoresPage = () => {
                                 <TableCell>{product.category}</TableCell>
                                 <TableCell>{product.subcategory}</TableCell>
                                 <TableCell>{product.price} ر.س</TableCell>
-                                {/* <TableCell>
-                                  <div className="flex gap-2">
-                                    <Button size="sm" variant="outline">
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="sm" variant="destructive">
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell> */}
                                 <TableCell>{product.quantity}</TableCell>
                                 <TableCell>{product.discount}</TableCell>
                                 <TableCell>{product.discountedPrice}</TableCell>                                
@@ -667,67 +630,72 @@ const AdminStoresPage = () => {
                         rows={2}
                         required
                       />
-
                     </div>
 
                     <div>
-                      <Label htmlFor="deliveryRange">نطاق التوصيل</Label>
+                      <Label htmlFor="deliveryRange">نطاق التوصيل (كم)</Label>
                       <Input
                         type='number'
                         id="deliveryRange"
                         value={formData.deliveryRangeKm}
-                        onChange={(e) => setFormData({ ...formData, deliveryRangeKm:  parseInt(e.target.value) })}
-                        placeholder="15 كيلومتر من المتجر"
+                        onChange={(e) => setFormData({ ...formData, deliveryRangeKm: parseInt(e.target.value) || 0 })}
+                        placeholder="15"
                         required
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="lat">خط العرض</Label>
-                        <Input
-                          id="lat"
-                          type="number"
-                          step="any"
-                          value={formData.location.coordinates.lat}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              location: {
-                                ...formData.location,
-                                coordinates: {
-                                  ...formData.location.coordinates,
-                                  lat: parseFloat(e.target.value) || 0
-                                }
-                              }
-                            })
-                          }
-
-                          placeholder="24.7136"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="lng">خط الطول</Label>
+                        <Label htmlFor="lng">خط الطول (Longitude)</Label>
                         <Input
                           id="lng"
                           type="number"
                           step="any"
-                          value={formData.location.coordinates.lng}                          
-                          onChange={(e) =>setFormData({
-                            ...formData,
-                            location: {
-                              ...formData.location,
-                              coordinates: {
-                                ...formData.location.coordinates,
-                                lng: parseFloat(e.target.value) || 0
+                          value={formData.location.coordinates[0] || ""} // longitude is at index 0
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              location: {
+                                ...prev.location,
+                                coordinates: [
+                                  parseFloat(e.target.value) || 0,   // longitude
+                                  prev.location.coordinates[1] || 0  // latitude
+                                ]
                               }
-                            }
-                          })}
-                          placeholder="46.6753"
+                            }))
+                          }
+                          placeholder="31.2357"
                         />
                       </div>
+
+                      <div>
+                        <Label htmlFor="lat">خط العرض (Latitude)</Label>
+                        <Input
+                          id="lat"
+                          type="number"
+                          step="any"
+                          value={formData.location.coordinates[1] || ""} // latitude is at index 1
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              location: {
+                                ...prev.location,
+                                coordinates: [
+                                  prev.location.coordinates[0] || 0, // longitude
+                                  parseFloat(e.target.value) || 0    // latitude
+                                ]
+                              }
+                            }))
+                          }
+                          placeholder="30.0444"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>اختيار الموقع على الخريطة</Label>
                       <MapContainer
-                        center={[formData.location.coordinates.lat, formData.location.coordinates.lng]}
+                        center={[formData.location.coordinates[1], formData.location.coordinates[0]]} // Leaflet: [lat, lng]
                         zoom={13}
                         style={{ height: '400px', width: '100%', marginTop: '1rem' }}
                       >
@@ -742,18 +710,18 @@ const AdminStoresPage = () => {
                               ...prev,
                               location: {
                                 ...prev.location,
-                                coordinates: { lat, lng },
+                                coordinates: [lng, lat], // GeoJSON format: [longitude, latitude]
                               },
                             }));
                           }}
                         />
 
-                        <Marker position={[formData.location.coordinates.lat, formData.location.coordinates.lng]}>
+                        <Marker position={[formData.location.coordinates[1], formData.location.coordinates[0]]}>
                           <Popup>موقع المتجر</Popup>
                         </Marker>
                       </MapContainer>
                     </div>
-
+                    
                     {/* Working Hours */}
                     <div>
                       <Label>ساعات العمل</Label>
@@ -857,7 +825,7 @@ const AdminStoresPage = () => {
                       
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Truck className="h-4 w-4 text-blue-500" />
-                        <span>نطاق التوصيل: {store.deliveryRangeKm}</span>
+                        <span>نطاق التوصيل: {store.deliveryRangeKm} كم</span>
                       </div>
                       
                       <div className="flex items-center gap-2 text-muted-foreground">

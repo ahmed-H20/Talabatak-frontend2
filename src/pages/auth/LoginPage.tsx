@@ -10,6 +10,7 @@ import { Container } from '@/components/layout/Container';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/services/authService';
 import { json } from 'stream/consumers';
+import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 
 const LoginPage = () => {
   const [credentials, setCredentials] = useState({ phone: '', password: '' });
@@ -19,6 +20,81 @@ const LoginPage = () => {
   const { toast } = useToast();
 
   const from = location.state?.from?.pathname || '/';
+
+
+const login = useGoogleLogin({
+  onSuccess: async (tokenResponse) => {
+    setIsLoading(true);
+    
+    try {
+      // Fetch user info from Google
+      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: {
+          Authorization: `Bearer ${tokenResponse.access_token}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch Google user info');
+      }
+
+      const googleUserInfo = await res.json();
+
+      // TEMPORARY: Create a mock user object that matches your app's format
+      const mockUser = {
+        _id: googleUserInfo.sub,
+        name: googleUserInfo.name,
+        phone: '', // Empty for now - user can add later
+        email: googleUserInfo.email,
+        location: {
+          coordinates: [0, 0],
+          address: ''
+        },
+        role: "user", // Default role
+        isPhoneVerified: false,
+        photo: googleUserInfo.picture,
+        provider: 'google',
+        providerId: googleUserInfo.sub
+      };
+
+      // Store temporary session data
+      localStorage.setItem("token", `google_${tokenResponse.access_token}`);
+      localStorage.setItem("user", JSON.stringify(mockUser));
+      localStorage.setItem("isGoogleAuth", "true");
+
+      console.log("User logged in with Google:", mockUser);
+
+      // Navigate to main page (Google users are typically regular users)
+      navigate("/");
+      window.location.reload();
+
+      toast({
+        title: "تم تسجيل الدخول بنجاح",
+        description: `مرحباً بك ${mockUser.name}`,
+        className: "bg-success text-success-foreground"
+      });
+      
+    } catch (error) {
+      console.error("Error with Google login:", error);
+      
+      toast({
+        title: "خطأ في تسجيل الدخول",
+        description: error instanceof Error ? error.message : "حدث خطأ في تسجيل الدخول بجوجل",
+        className: "bg-destructive text-destructive-foreground"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  },
+  onError: (error) => {
+    console.error("Google Login Failed:", error);
+    toast({
+      title: "خطأ في تسجيل الدخول", 
+      description: "فشل في تسجيل الدخول بجوجل",
+      className: "bg-destructive text-destructive-foreground"
+    });
+  },
+});
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +189,23 @@ const LoginPage = () => {
                 {isLoading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
                 <ArrowRight className="mr-2 h-4 w-4" />
               </Button>
+              {/* <GoogleLogin
+                onSuccess={credentialResponse => {
+                  console.log(credentialResponse);
+                  login()
+                }}
+                onError={() => {
+                  console.log('Login Failed');
+                }}
+              /> */}
+              <Button 
+                className='bg-white text-black w-full' 
+                onClick={() => login()}
+                disabled={isLoading}
+              >
+                {isLoading ? 'جاري تسجيل الدخول...' : 'Sign in with Google'}
+                <img width="30" height="30" src="https://img.icons8.com/fluency/48/google-logo.png" alt="google-logo"/>
+              </Button>
             </form>
             
             <div className="mt-6 text-center">
@@ -122,7 +215,7 @@ const LoginPage = () => {
                   إنشاء حساب جديد
                 </Link>
               </p>
-            </div>
+            </div>          
           </CardContent>
         </Card>
       </Container>

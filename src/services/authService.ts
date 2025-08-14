@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
 
 export interface User {
   _id: string;
@@ -313,8 +313,99 @@ class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return localStorage.getItem('token') ? true : false ;
-  }
+  const token = localStorage.getItem('token');
+  const googleUser = localStorage.getItem('user');
+  
+  // Check for regular token OR Google authentication
+  return !!(token || (googleUser && JSON.parse(googleUser).provider === 'google'));
 }
+
+
+
+getCurrentUser(): User | null {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    
+    try {
+      const user = JSON.parse(userStr);
+      return user;
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      return null;
+    }
+  }
+
+  // Updated logout to handle Google auth cleanup
+  async logout(): Promise<void> {
+    const isGoogleAuth = localStorage.getItem('isGoogleAuth');
+    
+    // If it's a regular backend session, call backend logout
+    if (!isGoogleAuth) {
+      try {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: this.getAuthHeaders(),
+        });
+      } catch (error) {
+        console.error('Logout request failed:', error);
+        // Continue with local cleanup even if backend call fails
+      }
+    }
+    
+    // Clean up all auth-related localStorage items
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('isGoogleAuth');
+  }
+
+  // Method to check if user needs to complete profile (for Google users)
+  needsProfileCompletion(): boolean {
+    const user = this.getCurrentUser();
+    return !!(user && user.provider === 'google' && !user.phone);
+  }
+
+  // Future method for when backend Google endpoint is ready
+  async googleAuthWithBackend(googleUserData: {
+    providerId: string;
+    name: string;
+    email: string;
+    photo?: string;
+  }): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...googleUserData,
+        provider: 'google'
+      }),
+    });
+
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const textResponse = await response.text();
+      console.error('Non-JSON response:', textResponse);
+      throw new Error('Server endpoint not available yet');
+    }
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Google authentication failed');
+    }
+
+    const result = await response.json();
+    
+    if (result.token) {
+      localStorage.setItem('token', result.token);
+      localStorage.setItem('user', JSON.stringify(result.user));
+      localStorage.removeItem('isGoogleAuth'); // Remove temp flag
+    }
+    
+    return result;
+  }
+
+}
+
+
 
 export const authService = new AuthService();
