@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
 
 export interface User {
   _id: string;
@@ -320,6 +320,7 @@ class AuthService {
   return !!(token || (googleUser && JSON.parse(googleUser).provider === 'google'));
 }
 
+<<<<<<< HEAD
 
 
 getCurrentUser(): User | null {
@@ -409,3 +410,6 @@ getCurrentUser(): User | null {
 
 
 export const authService = new AuthService();
+=======
+export const authService = new AuthService();
+>>>>>>> 962871a8f6d4c42fd03ac70fffd298c822c7e4be
