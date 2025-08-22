@@ -35,6 +35,10 @@ const CartPage = () => {
         id:string;
         product: {
           id: string;
+          store:{
+            _id: string;
+            name: string;
+          };
           name: string;
           images:['']
           unit:string;
@@ -54,7 +58,7 @@ const CartPage = () => {
   // Initialize Socket.IO connection
   useEffect(() => {
     if (user && token) {
-      const socketConnection = io('https://talabatak-backend2-zw4i.onrender.com', {
+      const socketConnection = io('http://localhost:5000', {
         auth: {
           token: token
         }
@@ -68,7 +72,7 @@ const CartPage = () => {
         console.log('Order created:', data);
         toast({
           title: "تم إنشاء الطلب بنجاح",
-          description: `طلب رقم: ${data.orderId}`,
+          description: `طلب رقم: ${data.order._id.slice(-8)}`,
         });
       });
 
@@ -88,9 +92,10 @@ const CartPage = () => {
     }
   }, []); // Empty dependency array since we only want this to run once
 
+  const deliveryCoordinates = JSON.parse(localStorage.getItem("userLocation"))
+  
   // Create Order Function
   // In your CartPage component, modify the createOrder function:
-
 const createOrder = async () => {
   if (!deliveryAddress.trim()) {
     toast({
@@ -112,26 +117,23 @@ const createOrder = async () => {
 
   try {
     setIsCreatingOrder(true);
-
+    
     // Prepare order items in the format expected by backend
-    const orderItems = cartItems.data.cartItems.map(item => ({
-      product: item.product.id,
-      quantity: item.quantity
-    }));
-
     const orderData = {
-      orderItems,
+      cartItems: cartItems.data.cartItems.map(item => ({
+        store: item.product.store._id,
+        product: item.product.id,
+        quantity: item.quantity,
+        price: item.price
+      })),
       deliveryAddress: deliveryAddress.trim(),
-      // 🔥 ADD THESE LINES:
-      appliedCoupon: couponCode || null,
-      originalTotal: totalPrice,
-      discountedTotal: afterDiscount || totalPrice,
-      discountAmount: afterDiscount ? (totalPrice - afterDiscount) : 0
+      deliveryCoordinates: [deliveryCoordinates.lat, deliveryCoordinates.lon] // لازم تجيبها من الـ LocationSelector
     };
+
 
     console.log('Creating order with data:', orderData);
 
-    const response = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/', {
+    const response = await fetch('http://localhost:5000/api/orders/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -150,7 +152,7 @@ const createOrder = async () => {
 
     toast({
       title: "تم إنشاء الطلب بنجاح",
-      description: `تم إنشاء ${data.totalOrders} طلب/طلبات`,
+      description: `!${data.orders[0].user.name}تم انشاء طلبك `,
     });
 
     // Clear the cart and delivery address
@@ -177,7 +179,7 @@ const createOrder = async () => {
 
     try {
       setIsApplying(true);
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/coupons/useCoupon`, {
+      const res = await fetch(`http://localhost:5000/api/coupons/useCoupon`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -204,10 +206,9 @@ const createOrder = async () => {
     }
   };
   
-  const fetchCart = async () => {
-    
+  const fetchCart = async () => {    
     try {
-      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/cartUser`, {
+      const response = await fetch(`http://localhost:5000/api/cart/cartUser`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -257,7 +258,7 @@ const createOrder = async () => {
 
   try {
     // ✅ Call API to update quantity in backend
-    const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/updateCartItem/${id}`, {
+    const res = await fetch(`http://localhost:5000/api/cart/updateCartItem/${id}`, {
       method:  "PUT",
       headers: { 
         "Content-Type": "application/json" ,
@@ -284,7 +285,7 @@ const createOrder = async () => {
     console.log(id)
     try {
     // ✅ Call API to delete in backend
-    const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/deletecart/${id}`, {
+    const res = await fetch(`http://localhost:5000/api/cart/deletecart/${id}`, {
       method:  "DELETE",
       headers: { 
         "Content-Type": "application/json" ,

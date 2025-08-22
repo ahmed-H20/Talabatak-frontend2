@@ -38,7 +38,7 @@ export const SocketProvider = ({ children }: SocketProviderProps) => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
+    const socketInstance = io('http://localhost:5000', {
       auth: {
         token: token
       },

@@ -1,4 +1,4 @@
-import { Package, Clock, CheckCircle, XCircle, Bell, RefreshCw, MapPin, User, Store, Edit, X } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Bell, RefreshCw, MapPin, User, Store, Edit, X, ThumbsUp, Truck, UserCheck, ShoppingBag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,64 +10,47 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { io, Socket } from 'socket.io-client';
 
-// Interface for User location
-interface Location {
-  coordinates: [number, number];
+interface GeoPoint {
   type: "Point";
+  coordinates: [number, number]; // [lng, lat]
 }
 
-// Interface for User
-interface User {
+interface ProductInfo {
   _id: string;
   name: string;
-  location: Location;
-  phone: string;
+  images: []
 }
 
-// Interface for Store location
-interface StoreLocation {
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  address: string;
-}
-
-// Interface for Store
-interface Store {
-  _id: string;
-  name: string;
-  location: StoreLocation;
-}
-
-interface Product {
-  _id: string;
-  name: string;
-  description?: string;
-  images?: string[];
-}
-
-// Interface for Order Item
 interface OrderItem {
-  product: Product;
+  product: ProductInfo;
   quantity: number;
   price: number;
 }
 
-// Main Order Interface
+interface StoreInfo {
+  _id: string;
+  name: string;
+  phone: string
+}
+
 interface Order {
   _id: string;
-  user: User;
-  store: Store;
+  user: {
+    _id: string,
+    name: string
+    phone :string
+  }; // user ID
+  store: StoreInfo;
   orderItems: OrderItem[];
   deliveryAddress: string;
   deliveryFee: number;
   totalPrice: number;
-  groupOrderId: string;
-  status: "processing" | "pending" | "cancelled" | "delivered" | "rejected";
+  discountAmount: number;
+  status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'rejected';
+  deliveryLocation: GeoPoint;
+  storeLocation: GeoPoint;
   createdAt: string;
   updatedAt: string;
-  __v: number;
 }
 
 const OrdersPage = () => {
@@ -77,37 +60,17 @@ const OrdersPage = () => {
   const { toast } = useToast();
   const token = localStorage.getItem("token");
 
-  // Function to create Google Maps link
-  const createGoogleMapsLink = (lat: number, lng: number, label?: string) => {
-    const baseUrl = 'https://www.google.com/maps';
-    if (label) {
-      return `${baseUrl}/search/?api=1&query=${encodeURIComponent(label)}&query_place_id=${lat},${lng}`;
-    }
-    return `${baseUrl}?q=${lat},${lng}`;
-  };
-
-  // Get user location Google Maps link
-  const getUserLocationLink = (user: User | null) => {
-    if (user?.location?.coordinates && user.location.coordinates.length === 2) {
-      const [lng, lat] = user.location.coordinates; // GeoJSON format is [lng, lat]
-      return createGoogleMapsLink(lat, lng, `موقع ${user.name}`);
-    }
-    return null;
-  };
-
-  // Get store location Google Maps link
-  const getStoreLocationLink = (store: Store | null) => {
-    if (store?.location?.coordinates) {
-      const { lat, lng } = store.location.coordinates;
-      return createGoogleMapsLink(lat, lng, store.name);
-    }
-    return null;
+  // Create Link from coordinates
+  const getGoogleMapsLink = (lat, lng) => {
+    console.log(lat, lng)
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    return `https://www.google.com/maps?q=${lat},${lng}`;
   };
 
   // Initialize Socket.IO connection
   useEffect(() => {
     if (token) {
-      const socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
+      const socketInstance = io('http://localhost:5000', {
         auth: {
           token: token
         }
@@ -207,7 +170,7 @@ const OrdersPage = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/', {
+      const res = await fetch('http://localhost:5000/api/orders/', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -239,7 +202,7 @@ const OrdersPage = () => {
     }
 
     try {
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/cancel`, {
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/cancel`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -282,7 +245,7 @@ const OrdersPage = () => {
     if (!newAddress) return;
 
     try {
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/update`, {
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/update`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -349,9 +312,18 @@ const OrdersPage = () => {
         return <Clock className="h-4 w-4" />;
       case 'cancelled':
       case 'rejected':
+      case 'delivery_failed':
         return <XCircle className="h-4 w-4" />;
       case 'pending':
         return <Package className="h-4 w-4" />;
+      case 'accepted': // قبل الطلب
+        return <ThumbsUp className="h-4 w-4" />;
+      case 'picked_up': // استلم من المتجر
+        return <ShoppingBag className="h-4 w-4" />;
+      case 'on_the_way': // في الطريق للعميل
+        return <Truck className="h-4 w-4" />;
+      case 'assigned_to_delivery': // لما يتخصص لمندوب
+        return <UserCheck className="h-4 w-4" />;
       default:
         return <Package className="h-4 w-4" />;
     }
@@ -364,24 +336,39 @@ const OrdersPage = () => {
       case 'processing':
         return 'قيد المعالجة';
       case 'cancelled':
+      case 'delivery_failed':
         return 'ملغي';
       case 'rejected':
         return 'مرفوض';
       case 'pending':
         return 'بانتظار المراجعة';
+      case 'assigned_to_delivery':
+        return 'تم تخصيص الطلب لمندوب';
+      case 'accepted':
+        return 'تم قبول الطلب من المندوب';
+      case 'picked_up':
+        return 'تم استلام الطلب من المتجر';
+      case 'on_the_way':
+        return 'الطلب في الطريق للعميل';
       default:
         return 'جديد';
     }
   };
 
+
+  console.log(orders)
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'delivered':
         return 'bg-green-100 text-green-800';
+      case 'assigned_to_delivery':
+        return 'bg-yellow-100 text-white-800';
       case 'processing':
         return 'bg-blue-100 text-blue-800';
       case 'cancelled':
       case 'rejected':
+      case 'delivery_failed':
         return 'bg-red-100 text-red-800';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
@@ -450,18 +437,20 @@ const OrdersPage = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">
-                        طلب رقم #{order._id.slice(-8)}
+                        طلب رقم #{order._id.slice(-8)}  
                       </CardTitle>
+                      
                       <div className="flex items-center gap-2">
                         <Badge className={getStatusVariant(order.status)}>
                           {getStatusIcon(order.status)}
                           <span className="mr-1">{getStatusText(order.status)}</span>
+                         
                         </Badge>
                         
                         {/* Action buttons for pending orders */}
                         {canModifyOrder(order.status) && (
                           <div className="flex gap-1">
-                            {/* <Button
+                            <Button
                               size="sm"
                               variant="outline"
                               onClick={() => updateOrder(order._id, order)}
@@ -469,7 +458,7 @@ const OrdersPage = () => {
                               title="تعديل الطلب"
                             >
                               <Edit className="h-3 w-3" />
-                            </Button> */}
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -484,6 +473,7 @@ const OrdersPage = () => {
                       </div>
                     </div>
                     <div className="space-y-2 text-sm text-muted-foreground">
+                       <span className='bg-red-100 text-red-800 display-block'>{order.failureReason? "نأسف " + order.failureReason: ""}</span>
                       <p>التاريخ: {new Date(order.createdAt).toLocaleDateString('ar-SA')}</p>
                       <p>الوقت: {new Date(order.createdAt).toLocaleTimeString('ar-SA')}</p>
                       
@@ -491,17 +481,22 @@ const OrdersPage = () => {
                       <div className="flex items-center gap-2">
                         <Store className="h-4 w-4" />
                         <span>المتجر: {order.store?.name || 'غير محدد'}</span>
-                        {order.store && getStoreLocationLink(order.store) && (
+                        {order.store && order.storeLocation ? 
                           <a
-                            href={getStoreLocationLink(order.store)!}
+                            href={getGoogleMapsLink(
+                              order.storeLocation.coordinates[1], 
+                              order.storeLocation.coordinates[0]
+                            )}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors"
+                            className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 transition-colors"
                           >
                             <MapPin className="h-3 w-3" />
                             عرض الموقع
                           </a>
-                        )}
+                          :
+                          ""
+                        }
                       </div>
 
                       {/* User Information with Google Maps Link */}
@@ -509,9 +504,12 @@ const OrdersPage = () => {
                         <User className="h-4 w-4" />
                         <span>العميل: {order.user?.name || 'غير محدد'}</span>
                         {order.user?.phone && <span>({order.user.phone})</span>}
-                        {order.user && getUserLocationLink(order.user) && (
+                        {order.user && order.deliveryLocation ? 
                           <a
-                            href={getUserLocationLink(order.user)!}
+                            href={getGoogleMapsLink(
+                              order.deliveryLocation.coordinates[0], 
+                              order.deliveryLocation.coordinates[1]
+                            )}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 transition-colors"
@@ -519,7 +517,9 @@ const OrdersPage = () => {
                             <MapPin className="h-3 w-3" />
                             موقع العميل
                           </a>
-                        )}
+                          :
+                          ""
+                        }
                       </div>
 
                       <p>عنوان التسليم: {order.deliveryAddress}</p>

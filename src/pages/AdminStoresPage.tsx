@@ -180,7 +180,7 @@ const AdminStoresPage = () => {
 
   const fetchStores = async () => {
     try {
-      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/stores', {
+      const res = await fetch('http://localhost:5000/api/stores', {
         headers: {
           'Content-Type': 'application/json',                    
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -210,7 +210,7 @@ const AdminStoresPage = () => {
     console.log(formData);
     if (editingStore) {
       try {
-        const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores/${editingStore._id}`, {
+        const res = await fetch(`http://localhost:5000/api/stores/${editingStore._id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -227,6 +227,8 @@ const AdminStoresPage = () => {
         });
         if (!res.ok) {
           console.log("Store not updated");
+          toast({ title: 'خطأ فى تحديث المتجر' });
+          return
         }
         const data = await res.json();
         console.log("Store updated successfully", data);
@@ -240,7 +242,7 @@ const AdminStoresPage = () => {
       }
     } else {
       try {
-        const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores`, {
+        const res = await fetch(`http://localhost:5000/api/stores`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -257,6 +259,8 @@ const AdminStoresPage = () => {
         });
         if (!res.ok) {
           console.log("Store not Created");
+          toast({ title: 'فشل اضافة المتجر' });
+          return
         }
         const data = await res.json();
         console.log("Store created successfully", data);
@@ -320,7 +324,7 @@ const AdminStoresPage = () => {
 
   const handleDelete = (id: string) => {
     // Call API to delete store
-    fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores/${id}`, {
+    fetch(`http://localhost:5000/api/stores/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

@@ -25,38 +25,48 @@ import { useToast } from '@/hooks/use-toast';
 import { BaseLayout } from '@/components/layout/BaseLayout';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
+interface GeoPoint {
+  type: "Point";
+  coordinates: [number, number]; // [lng, lat]
+}
+
+interface ProductInfo {
+  _id: string;
+  name: string;
+}
+
 interface OrderItem {
-  product: {
-    _id: string;
-    name: string;
-    images?: string[];
-  };
+  product: ProductInfo;
   quantity: number;
   price: number;
+}
+
+interface StoreInfo {
+  _id: string;
+  name: string;
+  phone: string
 }
 
 interface Order {
   _id: string;
   user: {
-    _id: string;
-    name: string;
-    phone?: string;
-    location?: string | object;
-  } | null;
-  store: {
-    _id: string;
-    name: string;
-    location?: string | object;
-  } | null;
+    _id: string,
+    name: string
+    phone :string
+  }; // user ID
+  store: StoreInfo;
   orderItems: OrderItem[];
   deliveryAddress: string;
   deliveryFee: number;
   totalPrice: number;
+  discountAmount: number;
   status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'rejected';
+  deliveryLocation: GeoPoint;
+  storeLocation: GeoPoint;
   createdAt: string;
   updatedAt: string;
-  groupOrderId?: string;
 }
+
 
 const AdminOrdersPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -232,7 +242,7 @@ const AdminOrdersPage = () => {
   useEffect(() => {
     const token = getAuthToken();
     if (token) {
-      const socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
+      const socketInstance = io('http://localhost:5000', {
         auth: {
           token: token
         }
@@ -307,12 +317,19 @@ const AdminOrdersPage = () => {
     }
   }, [toast, soundEnabled, notificationPermission]);
 
+  // helper function
+  const getGoogleMapsLink = (lat, lng) => {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    return `https://www.google.com/maps?q=${lat},${lng}`;
+  };
+
+
   // Fetch all orders
   const fetchOrders = async () => {
     try {
       setLoading(true);
       const token = getAuthToken();
-      const response = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/all', {
+      const response = await fetch('http://localhost:5000/api/orders/all', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -343,7 +360,7 @@ const AdminOrdersPage = () => {
       setUpdatingStatus(orderId);
       const token = getAuthToken();
       
-      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/status`, {
+      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -545,7 +562,22 @@ const AdminOrdersPage = () => {
                         <div>
                           <CardTitle className="text-lg">طلب رقم #{order._id.slice(-8)}</CardTitle>
                           <p className="text-sm text-gray-500 mt-1">
-                            {formatDate(order.createdAt)} • متجر: {order.store?.name || 'متجر محذوف'}
+                            {formatDate(order.createdAt)} • متجر: {
+                            
+                            order.store?.name && order.storeLocation ?
+                            <a
+                            href={getGoogleMapsLink(
+                              order.storeLocation.coordinates[1], // lat
+                              order.storeLocation.coordinates[0]  // lng
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {order.store?.name}
+                          </a>
+                            
+                            : 'متجر محذوف'}
                           </p>
                         </div>
                         <Badge className={getStatusVariant(order.status)}>
@@ -556,53 +588,41 @@ const AdminOrdersPage = () => {
                     </CardHeader>
                     
                     <CardContent>
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="font-medium mb-3 text-gray-900">معلومات العميل</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-700">الاسم:</span>
-                              <span>{order.user?.name || 'مستخدم محذوف'}</span>
-                            </div>
-                            {order.user?.phone && (
-                              <div className="flex items-center gap-2">
-                                <Phone className="h-4 w-4 text-gray-400" />
-                                <span>{order.user.phone}</span>
-                              </div>
-                            )}
-                            <div className="flex items-start gap-2">
-                              <MapPin className="h-4 w-4 text-gray-400 mt-1" />
-                              <span>{order.deliveryAddress}</span>
-                            </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-700">الاسم:</span>
+                          <span>{order.user?.name || 'مستخدم محذوف'}</span>
+                        </div>
+                        
+                        {order.user?.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-gray-400" />
+                            <span>{order.user.phone}</span>
                           </div>
+                        )}
+
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-gray-400 mt-1" />
+                          <span>{order.deliveryAddress}</span>
                         </div>
 
-                        <div>
-                          <h4 className="font-medium mb-3 text-gray-900">المنتجات</h4>
-                          <div className="space-y-2">
-                            {order.orderItems.map((item, index) => (
-                              <div key={index} className="flex justify-between items-center text-sm">
-                                <div>
-                                  <span className="font-medium">{item.product?.name || 'منتج محذوف'}</span>
-                                  <span className="text-gray-500 mr-2">x{item.quantity}</span>
-                                </div>
-                                <span className="font-semibold">{(item.price * item.quantity).toFixed(2)} جنيه</span>
-                              </div>
-                            ))}
-                            
-                            <div className="pt-2 space-y-1 border-t">
-                              <div className="flex justify-between text-sm">
-                                <span>رسوم التوصيل</span>
-                                <span>{order.deliveryFee.toFixed(2)} جنيه</span>
-                              </div>
-                              <div className="flex justify-between items-center font-bold text-lg">
-                                <span>المجموع الكلي</span>
-                                <span className="text-blue-600">{order.totalPrice.toFixed(2)} جنيه</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        {/* delevary login */}                        
+                        {order.deliveryLocation?.coordinates && (
+                          <a
+                            href={getGoogleMapsLink(
+                              order.deliveryLocation.coordinates[0], // lat
+                              order.deliveryLocation.coordinates[1]  // lng
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            عرض موقع التوصيل على الخريطة
+                          </a>
+                        )}
+
                       </div>
+
 
                       <div className="flex gap-2 mt-6 pt-4 border-t">
                         <Button
@@ -630,7 +650,7 @@ const AdminOrdersPage = () => {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => updateOrderStatus(order._id, 'rejected')}
+                              onClick={() => updateOrderStatus(order._id, 'cancelled')}
                               disabled={updatingStatus === order._id}
                             >
                               رفض الطلب
@@ -712,6 +732,34 @@ const AdminOrdersPage = () => {
                     <div>
                       <span className="text-gray-500">المتجر:</span>
                       <p>{selectedOrder.store?.name || 'متجر محذوف'}</p>
+                      <a
+                        href={getGoogleMapsLink(
+                          selectedOrder.storeLocation.coordinates[1], // lat
+                          selectedOrder.storeLocation.coordinates[0]  // lng
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        عرض موقع المتجر على الخريطة
+                      </a>
+                      <p>تلفون : {selectedOrder.store?.phone || 'لا يوجد رقم'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">العميل:</span>
+                      <p>{selectedOrder.user?.name || 'خطأ معلومات العميل'}</p>
+                      <a
+                        href={getGoogleMapsLink(
+                          selectedOrder.deliveryLocation.coordinates[1], // lat
+                          selectedOrder.deliveryLocation.coordinates[0]  // lng
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        عرض موقع العميل على الخريطة
+                      </a>
+                      <p>تلفون : {selectedOrder.user?.phone || 'لا يوجد رقم'}</p>
                     </div>
                     <div>
                       <span className="text-gray-500">الحالة:</span>
