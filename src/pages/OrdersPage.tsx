@@ -87,7 +87,7 @@ const OrdersPage = () => {
   // Initialize Socket.IO connection
   useEffect(() => {
     if (token) {
-      const socketInstance = io('http://localhost:5000', {
+      const socketInstance = io('https://talabatak-backend2.vercel.app', {
         auth: {
           token: token
         }
@@ -197,7 +197,7 @@ const OrdersPage = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/orders/', {
+      const res = await fetch('https://talabatak-backend2.vercel.app/api/orders/', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -227,7 +227,7 @@ const OrdersPage = () => {
     try {
       setSubmittingRating(true);
       
-      const res = await fetch(`http://localhost:5000/api/delivery/rate/${orderId}`, {
+      const res = await fetch(`https://talabatak-backend2.vercel.app/api/delivery/rate/${orderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +283,7 @@ const OrdersPage = () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/cancel`, {
+      const res = await fetch(`https://talabatak-backend2.vercel.app/api/orders/${orderId}/cancel`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -326,7 +326,7 @@ const OrdersPage = () => {
     if (!newAddress) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/update`, {
+      const res = await fetch(`https://talabatak-backend2.vercel.app/api/orders/${orderId}/update`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
