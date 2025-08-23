@@ -30,6 +30,9 @@ import DeliveryDashboard from "./pages/deliveryPage";
 import AdminDeliveryManagement from "./pages/AdminDelivaryDashboard";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ProductForm from '@/pages/ProductForm'
+import { AppInitializer, AppLoader } from "./components/AppInitializer";
+import { GuestGuard, ProfileCompletionGuard } from "./components/auth/AuthenticationGuard";
+import CompleteProfilePage from "./components/auth/CompleteProfilePage";
 
 const queryClient = new QueryClient();
 const clientId = "599763874700-ma2che296dum9ktpadcirtdktdke3j32.apps.googleusercontent.com"
@@ -41,6 +44,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <LocationProvider>
+        <AppInitializer fallback={<AppLoader />}>
         <BrowserRouter>
         <GoogleOAuthProvider clientId={clientId} >
           <Routes>
@@ -48,7 +52,17 @@ const App = () => (
             <Route path="/auth/verify-phone" element={<VerifyPhonePage />} />
             <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/complete-profile" element={
+              <ProfileCompletionGuard>
+                <CompleteProfilePage />
+              </ProfileCompletionGuard>
+            } />
+
+            <Route path="/auth/login" element={
+              <GuestGuard>
+                <LoginPage />
+              </GuestGuard>
+            } />
             <Route path="/" element={<StorePage />} />
             <Route path="/cart" element={
               <ProtectedRoute>
@@ -94,6 +108,7 @@ const App = () => (
           </Routes>
           </GoogleOAuthProvider>
         </BrowserRouter>
+        </AppInitializer>
         </LocationProvider>
       </TooltipProvider>
     </AuthProvider>

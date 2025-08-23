@@ -1,7 +1,8 @@
-import { Package, Clock, CheckCircle, XCircle, Bell, RefreshCw, MapPin, User, Store, Edit, X, ThumbsUp, Truck, UserCheck, ShoppingBag } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Bell, RefreshCw, MapPin, User, Store, Edit, X, ThumbsUp, Truck, UserCheck, ShoppingBag, Star, Phone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { BaseLayout } from '@/components/layout/BaseLayout';
 import { Container } from '@/components/layout/Container';
 import { Header } from '@/components/store/Header';
@@ -33,6 +34,12 @@ interface StoreInfo {
   phone: string
 }
 
+interface DeliveryPersonInfo {
+  _id: string;
+  name: string;
+  phone: string;
+}
+
 interface Order {
   _id: string;
   user: {
@@ -46,23 +53,33 @@ interface Order {
   deliveryFee: number;
   totalPrice: number;
   discountAmount: number;
-  status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'rejected';
+  status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'rejected' | 'assigned_to_delivery' | 'on_the_way';
   deliveryLocation: GeoPoint;
   storeLocation: GeoPoint;
   createdAt: string;
   updatedAt: string;
+  assignedDeliveryPerson?: DeliveryPersonInfo;
+  assignedAt?: string;
+  failureReason?: string;
+  groupOrderId?: string;
+  // Rating fields
+  customerRating?: number;
+  customerFeedback?: string;
 }
 
 const OrdersPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [selectedOrderForRating, setSelectedOrderForRating] = useState<Order | null>(null);
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
   const { toast } = useToast();
   const token = localStorage.getItem("token");
 
   // Create Link from coordinates
   const getGoogleMapsLink = (lat, lng) => {
-    console.log(lat, lng)
     if (typeof lat !== 'number' || typeof lng !== 'number') return null;
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
@@ -84,7 +101,15 @@ const OrdersPage = () => {
         
         // Update the specific order in the list
         setOrders(prev => prev.map(order => 
-          order._id === updatedOrder._id ? { ...order, status: updatedOrder.status } : order
+          order._id === updatedOrder._id ? { 
+            ...order, 
+            status: updatedOrder.status,
+            assignedDeliveryPerson: updatedOrder.assignedDeliveryPerson,
+            assignedAt: updatedOrder.assignedAt,
+            failureReason: updatedOrder.failureReason,
+            // Add any other fields that might be updated
+            updatedAt: updatedOrder.updatedAt
+          } : order
         ));
         
         // Show notification based on status
@@ -93,7 +118,9 @@ const OrdersPage = () => {
           delivered: '✅ تم تسليم طلبك بنجاح!',
           cancelled: '❌ تم إلغاء طلبك',
           rejected: '⛔ تم رفض طلبك',
-          pending: '⏳ طلبك في انتظار المراجعة'
+          pending: '⏳ طلبك في انتظار المراجعة',
+          assigned_to_delivery: '🚚 تم تخصيص طلبك لمندوب التوصيل',
+          on_the_way: '🛣️ طلبك في الطريق إليك'
         };
 
         toast({
@@ -195,6 +222,60 @@ const OrdersPage = () => {
     }
   };
 
+  // Rate delivery function
+  const rateDelivery = async (orderId: string, rating: number, feedback: string) => {
+    try {
+      setSubmittingRating(true);
+      
+      const res = await fetch(`http://localhost:5000/api/delivery/rate/${orderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          rating,
+          feedback
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'فشل في تقييم المندوب');
+      }
+
+      // Update the order in the state to show it has been rated
+      setOrders(prev => prev.map(order => 
+        order._id === orderId ? { 
+          ...order, 
+          customerRating: rating, 
+          customerFeedback: feedback 
+        } : order
+      ));
+
+      toast({
+        title: '✅ تم التقييم بنجاح',
+        description: `تم تقييم مندوب توصيل طلب #${orderId.slice(-8)} بنجاح`,
+        duration: 3000,
+      });
+
+      // Close the rating modal
+      setSelectedOrderForRating(null);
+      setRating(0);
+      setFeedback('');
+      
+    } catch (error) {
+      console.error('Error rating delivery:', error);
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل في تقييم المندوب',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
   // Cancel order function
   const cancelOrder = async (orderId: string) => {
     if (!window.confirm('هل أنت متأكد من إلغاء هذا الطلب؟')) {
@@ -289,6 +370,11 @@ const OrdersPage = () => {
     return status === 'pending';
   };
 
+  // Check if order can be rated (delivered orders that haven't been rated yet)
+  const canRateOrder = (order: Order) => {
+    return order.status === 'delivered' && !order.customerRating && order.assignedDeliveryPerson;
+  };
+
   // Fetch orders on component mount
   useEffect(() => {
     fetchOrders();
@@ -355,15 +441,13 @@ const OrdersPage = () => {
     }
   };
 
-
-  console.log(orders)
-
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'delivered':
         return 'bg-green-100 text-green-800';
       case 'assigned_to_delivery':
-        return 'bg-yellow-100 text-white-800';
+      case 'on_the_way':
+        return 'bg-blue-100 text-blue-800';
       case 'processing':
         return 'bg-blue-100 text-blue-800';
       case 'cancelled':
@@ -375,6 +459,26 @@ const OrdersPage = () => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // Star rating component
+  const StarRating = ({ rating, onRatingChange }: { rating: number; onRatingChange: (rating: number) => void }) => {
+    return (
+      <div className="flex gap-1 justify-center">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => onRatingChange(star)}
+            className={`text-2xl transition-colors ${
+              star <= rating ? 'text-yellow-400' : 'text-gray-300'
+            } hover:text-yellow-400`}
+          >
+            <Star className={`h-6 w-6 ${star <= rating ? 'fill-current' : ''}`} />
+          </button>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
@@ -444,8 +548,20 @@ const OrdersPage = () => {
                         <Badge className={getStatusVariant(order.status)}>
                           {getStatusIcon(order.status)}
                           <span className="mr-1">{getStatusText(order.status)}</span>
-                         
                         </Badge>
+                        
+                        {/* Rate delivery button for delivered orders */}
+                        {canRateOrder(order) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedOrderForRating(order)}
+                            className="h-8 px-2 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50"
+                            title="تقييم مندوب التوصيل"
+                          >
+                            <Star className="h-3 w-3" />
+                          </Button>
+                        )}
                         
                         {/* Action buttons for pending orders */}
                         {canModifyOrder(order.status) && (
@@ -473,7 +589,7 @@ const OrdersPage = () => {
                       </div>
                     </div>
                     <div className="space-y-2 text-sm text-muted-foreground">
-                       <span className='bg-red-100 text-red-800 display-block'>{order.failureReason? "نأسف " + order.failureReason: ""}</span>
+                      <span className='bg-red-100 text-red-800 display-block'>{order.failureReason? "نأسف " + order.failureReason: ""}</span>
                       <p>التاريخ: {new Date(order.createdAt).toLocaleDateString('ar-SA')}</p>
                       <p>الوقت: {new Date(order.createdAt).toLocaleTimeString('ar-SA')}</p>
                       
@@ -481,6 +597,7 @@ const OrdersPage = () => {
                       <div className="flex items-center gap-2">
                         <Store className="h-4 w-4" />
                         <span>المتجر: {order.store?.name || 'غير محدد'}</span>
+                        {order.store?.phone && <span>({order.store.phone})</span>}
                         {order.store && order.storeLocation ? 
                           <a
                             href={getGoogleMapsLink(
@@ -492,7 +609,7 @@ const OrdersPage = () => {
                             className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 transition-colors"
                           >
                             <MapPin className="h-3 w-3" />
-                            عرض الموقع
+                            موقع المتجر
                           </a>
                           :
                           ""
@@ -502,8 +619,7 @@ const OrdersPage = () => {
                       {/* User Information with Google Maps Link */}
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4" />
-                        <span>العميل: {order.user?.name || 'غير محدد'}</span>
-                        {order.user?.phone && <span>({order.user.phone})</span>}
+                        <span>العميل: {order.user?.name || 'غير محدد'}</span>                        
                         {order.user && order.deliveryLocation ? 
                           <a
                             href={getGoogleMapsLink(
@@ -515,12 +631,67 @@ const OrdersPage = () => {
                             className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 transition-colors"
                           >
                             <MapPin className="h-3 w-3" />
-                            موقع العميل
+                            موقعك
                           </a>
                           :
                           ""
                         }
                       </div>
+
+                      {/* Delivery Person Information (when assigned) */}
+                      {order.assignedDeliveryPerson && (
+                        <div className="bg-blue-50 rounded-lg p-3 mt-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Truck className="h-4 w-4 text-blue-600" />
+                            <span className="font-medium text-blue-900">معلومات مندوب التوصيل:</span>
+                          </div>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex items-center gap-2">
+                              <User className="h-3 w-3 text-blue-600" />
+                              <span>الاسم: {order.assignedDeliveryPerson.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-3 w-3 text-blue-600" />
+                              <span>الهاتف: {order.assignedDeliveryPerson.phone}</span>
+                            </div>
+                            {order.assignedAt && (
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-3 w-3 text-blue-600" />
+                                <span>تم التخصيص: {new Date(order.assignedAt).toLocaleString('ar-SA')}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Customer Rating Display (if already rated) */}
+                      {order.customerRating && (
+                        <div className="bg-yellow-50 rounded-lg p-3 mt-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Star className="h-4 w-4 text-yellow-600 fill-current" />
+                            <span className="font-medium text-yellow-900">تقييمك لمندوب التوصيل:</span>
+                          </div>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-4 w-4 ${
+                                    star <= order.customerRating! ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                              <span className="mr-2 font-medium">{order.customerRating}/5</span>
+                            </div>
+                            {order.customerFeedback && (
+                              <div className="mt-2 text-yellow-800">
+                                <span className="font-medium">تعليقك: </span>
+                                <span>{order.customerFeedback}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <p>عنوان التسليم: {order.deliveryAddress}</p>
                       {order.store?.location?.address && (
@@ -593,6 +764,113 @@ const OrdersPage = () => {
           )}
         </Container>
       </main>
+
+      {/* Rating Modal */}
+      {selectedOrderForRating && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50">
+          <div className="w-full sm:max-w-md sm:mx-4">
+            <Card className="rounded-t-3xl sm:rounded-2xl border-0 shadow-2xl">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center">
+                      <Star className="h-5 w-5 text-yellow-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">تقييم مندوب التوصيل</CardTitle>
+                      <p className="text-sm text-gray-500">طلب #{selectedOrderForRating._id.slice(-6)}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedOrderForRating(null);
+                      setRating(0);
+                      setFeedback('');
+                    }}
+                    className="h-8 w-8 p-0 rounded-full"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-6 pb-6">
+                {/* Delivery Person Info */}
+                <div className="bg-blue-50 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">مندوب التوصيل:</span>
+                    <span className="font-medium">{selectedOrderForRating.assignedDeliveryPerson?.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">رقم الهاتف:</span>
+                    <span className="font-medium">{selectedOrderForRating.assignedDeliveryPerson?.phone}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">المبلغ الإجمالي:</span>
+                    <span className="font-bold text-green-600">{selectedOrderForRating.totalPrice.toFixed(2)} جنيه</span>
+                  </div>
+                </div>
+                
+                {/* Star Rating */}
+                <div className="space-y-3 text-center">
+                  <label className="text-sm font-medium text-gray-900">كيف تقيم خدمة التوصيل؟</label>
+                  <StarRating rating={rating} onRatingChange={setRating} />
+                  <p className="text-xs text-gray-500">
+                    {rating === 0 && "اختر تقييمك"}
+                    {rating === 1 && "سيء جداً"}
+                    {rating === 2 && "سيء"}
+                    {rating === 3 && "متوسط"}
+                    {rating === 4 && "جيد"}
+                    {rating === 5 && "ممتاز"}
+                  </p>
+                </div>
+                
+                {/* Feedback */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-900">تعليقك (اختياري)</label>
+                  <Textarea
+                    placeholder="شاركنا تجربتك مع مندوب التوصيل..."
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    rows={3}
+                    className="text-sm resize-none rounded-xl border-gray-200 focus:border-yellow-500 focus:ring-yellow-500"
+                  />
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-2">
+                  <Button 
+                    onClick={() => rateDelivery(selectedOrderForRating._id, rating, feedback)}
+                    disabled={rating === 0 || submittingRating}
+                    className="w-full h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold rounded-xl shadow-lg"
+                  >
+                    {submittingRating ? (
+                      <RefreshCw className="h-5 w-5 animate-spin ml-2" />
+                    ) : (
+                      <Star className="h-5 w-5 ml-2" />
+                    )}
+                    {submittingRating ? 'جاري الإرسال...' : 'إرسال التقييم'}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSelectedOrderForRating(null);
+                      setRating(0);
+                      setFeedback('');
+                    }}
+                    disabled={submittingRating}
+                    className="w-full h-11 rounded-xl border-gray-200 hover:bg-gray-50"
+                  >
+                    إلغاء
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </BaseLayout>

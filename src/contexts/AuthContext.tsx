@@ -7,6 +7,7 @@ interface AuthContextType {
   login: (phone: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  setUser: (user: User | null) => void; // Add setUser function
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,16 +33,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const checkAuth = async () => {
       try {
         const currentUser = authService.getCurrentUser();
+        const isGoogleAuth = localStorage.getItem('isGoogleAuth');
+        
         if (currentUser && authService.isAuthenticated()) {
-          // Verify token is still valid by calling profile endpoint
-          const response = await authService.getProfile();
-          setUser(response.user);
+          // For Google auth, we can use the stored user directly
+          if (isGoogleAuth === 'true') {
+            console.log('Restoring Google auth session:', currentUser);
+            setUser(currentUser);
+          } else {
+            // For regular auth, verify token is still valid by calling profile endpoint
+            try {
+              const response = await authService.getProfile();
+              setUser(response.user);
+            } catch (error) {
+              console.error('Token validation failed:', error);
+              // Token is invalid, clear local storage
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              localStorage.removeItem('authMethod');
+              setUser(null);
+            }
+          }
         }
       } catch (error) {
-        // Token is invalid, clear local storage
-        // localStorage.removeItem('token');
-        // localStorage.removeItem('user');
-        // setUser(null);
+        console.error('Auth check failed:', error);
+        // Clear any invalid session data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('authMethod');
+        localStorage.removeItem('isGoogleAuth');
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -60,11 +81,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
   };
 
+  // Add manual setUser function for external updates (like Google auth)
+  const handleSetUser = (newUser: User | null) => {
+    setUser(newUser);
+  };
+
   const value = {
     user,
     loading,
     login,
     logout,
+    setUser: handleSetUser,
     isAuthenticated: !!user && authService.isAuthenticated(),
   };
 

@@ -9,111 +9,188 @@ import { BaseLayout } from '@/components/layout/BaseLayout';
 import { Container } from '@/components/layout/Container';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/services/authService';
-import { json } from 'stream/consumers';
-import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
+import { useGoogleLogin } from '@react-oauth/google';
+import { useAuth } from '@/contexts/AuthContext';
 
 const LoginPage = () => {
   const [credentials, setCredentials] = useState({ phone: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { setUser } = useAuth();
 
   const from = location.state?.from?.pathname || '/';
 
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setIsGoogleLoading(true);
+      
+      try {
+        // Fetch user info from Google
+        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: {
+            Authorization: `Bearer ${tokenResponse.access_token}`,
+          },
+        });
 
-const login = useGoogleLogin({
-  onSuccess: async (tokenResponse) => {
-    setIsLoading(true);
-    
-    try {
-      // Fetch user info from Google
-      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: {
-          Authorization: `Bearer ${tokenResponse.access_token}`,
-        },
-      });
+        if (!res.ok) {
+          throw new Error('Failed to fetch Google user info');
+        }
 
-      if (!res.ok) {
-        throw new Error('Failed to fetch Google user info');
+        const googleUserInfo = await res.json();
+
+        // Send correct data to backend
+        const result = await authService.googleAuth({
+          providerId: googleUserInfo.sub, // Google user ID
+          name: googleUserInfo.name,
+          email: googleUserInfo.email,
+          photo: googleUserInfo.picture,
+          provider: 'google'
+        });
+
+        console.log("Google auth result:", result);
+
+        // Handle different response scenarios
+        if (result.isNewUser && result.needsProfileCompletion) {
+          // New Google user needs to complete profile
+          toast({
+            title: "مرحباً بك!",
+            description: "يرجى إكمال ملفك الشخصي للمتابعة",
+            className: "bg-blue-500 text-white"
+          });
+          
+          // Update auth context with incomplete user
+          if (setUser) {
+            setUser(result.user);
+          }
+          
+          navigate('/auth/complete-profile');
+          return;
+        }
+
+        // Existing user or completed profile
+        toast({
+          title: "تم تسجيل الدخول بنجاح",
+          description: `مرحباً بك ${result.user.name}`,
+          className: "bg-success text-success-foreground"
+        });
+
+        // Update auth context
+        if (setUser) {
+          setUser(result.user);
+        }
+
+        // Navigate based on role and delivery status
+        if (result.user.role === "delivery") {
+          if (result.deliveryInfo?.status === 'pending') {
+            toast({
+              title: "في انتظار الموافقة",
+              description: "طلب التوصيل الخاص بك قيد المراجعة",
+              className: "bg-yellow-500 text-white"
+            });
+            navigate("/");
+          } else if (result.deliveryInfo?.status === 'rejected') {
+            toast({
+              title: "تم رفض الطلب",
+              description: "تم رفض طلب التوصيل الخاص بك",
+              className: "bg-destructive text-destructive-foreground"
+            });
+            navigate("/");
+          } else {
+            navigate("/deliveryDashboard");
+          }
+        } else if (result.user.role === "admin") {
+          navigate("/admin/dashboard");
+        } else {
+          navigate(from);
+        }
+        
+      } catch (error) {
+        console.error("Error with Google login:", error);
+        
+        let errorMessage = "حدث خطأ في تسجيل الدخول بجوجل";
+        
+        if (error instanceof Error) {
+          // Handle specific error messages
+          if (error.message.includes('Missing required Google auth data')) {
+            errorMessage = "بيانات جوجل غير مكتملة";
+          } else if (error.message.includes('This Google account is already registered')) {
+            errorMessage = "هذا الحساب مسجل مسبقاً";
+          } else {
+            errorMessage = error.message;
+          }
+        }
+        
+        toast({
+          title: "خطأ في تسجيل الدخول",
+          description: errorMessage,
+          className: "bg-destructive text-destructive-foreground"
+        });
+      } finally {
+        setIsGoogleLoading(false);
       }
-
-      const googleUserInfo = await res.json();
-
-      // TEMPORARY: Create a mock user object that matches your app's format
-      const mockUser = {
-        _id: googleUserInfo.sub,
-        name: googleUserInfo.name,
-        phone: '', // Empty for now - user can add later
-        email: googleUserInfo.email,
-        location: {
-          coordinates: [0, 0],
-          address: ''
-        },
-        role: "user", // Default role
-        isPhoneVerified: false,
-        photo: googleUserInfo.picture,
-        provider: 'google',
-        providerId: googleUserInfo.sub
-      };
-
-      // Store temporary session data
-      localStorage.setItem("token", `google_${tokenResponse.access_token}`);
-      localStorage.setItem("user", JSON.stringify(mockUser));
-      localStorage.setItem("isGoogleAuth", "true");
-
-      console.log("User logged in with Google:", mockUser);
-
-      // Navigate to main page (Google users are typically regular users)
-      navigate("/");
-      window.location.reload();
-
+    },
+    onError: (error) => {
+      console.error("Google Login Failed:", error);
+      setIsGoogleLoading(false);
       toast({
-        title: "تم تسجيل الدخول بنجاح",
-        description: `مرحباً بك ${mockUser.name}`,
-        className: "bg-success text-success-foreground"
-      });
-      
-    } catch (error) {
-      console.error("Error with Google login:", error);
-      
-      toast({
-        title: "خطأ في تسجيل الدخول",
-        description: error instanceof Error ? error.message : "حدث خطأ في تسجيل الدخول بجوجل",
+        title: "خطأ في تسجيل الدخول", 
+        description: "فشل في تسجيل الدخول بجوجل",
         className: "bg-destructive text-destructive-foreground"
       });
-    } finally {
-      setIsLoading(false);
-    }
-  },
-  onError: (error) => {
-    console.error("Google Login Failed:", error);
-    toast({
-      title: "خطأ في تسجيل الدخول", 
-      description: "فشل في تسجيل الدخول بجوجل",
-      className: "bg-destructive text-destructive-foreground"
-    });
-  },
-});
+    },
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!credentials.phone.trim() || !credentials.password.trim()) {
+      toast({
+        title: "خطأ في البيانات",
+        description: "يرجى إدخال رقم الهاتف وكلمة المرور",
+        className: "bg-destructive text-destructive-foreground"
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const result = await authService.login(credentials.phone, credentials.password);
-      console.log(result.role)
-      if (result.role == "delivery"){
-        navigate("/deliveryDashboard");      
-      }
-      else if(result.role == "admin"){
-        navigate("/admin/dashboard");
-      }
-      else{
-        navigate("/");
-        window.location.reload();
-      }    
+      console.log("Login result:", result);
       
+      // Update auth context
+      if (setUser) {
+        setUser(result.user);
+      }
+      
+      // Handle delivery users with different statuses
+      if (result.role === "delivery") {
+        if (result.deliveryInfo?.status === 'pending') {
+          toast({
+            title: "في انتظار الموافقة",
+            description: "طلب التوصيل الخاص بك قيد المراجعة",
+            className: "bg-yellow-500 text-white"
+          });
+          navigate("/");
+        } else if (result.deliveryInfo?.status === 'rejected') {
+          toast({
+            title: "تم رفض الطلب", 
+            description: result.deliveryInfo.rejectionReason || "تم رفض طلب التوصيل الخاص بك",
+            className: "bg-destructive text-destructive-foreground"
+          });
+          navigate("/");
+        } else {
+          navigate("/deliveryDashboard");
+        }
+      } else if (result.role === "admin") {
+        navigate("/admin/dashboard");
+      } else {
+        navigate(from);
+      }
 
       toast({
         title: "تم تسجيل الدخول بنجاح",
@@ -122,9 +199,26 @@ const login = useGoogleLogin({
       });
      
     } catch (error) {
+      console.error("Login error:", error);
+      
+      let errorMessage = "حدث خطأ غير متوقع";
+      
+      if (error instanceof Error) {
+        // Handle specific error cases
+        if (error.message.includes('Invalid phone or password')) {
+          errorMessage = "رقم الهاتف أو كلمة المرور غير صحيحة";
+        } else if (error.message.includes('pending approval')) {
+          errorMessage = "طلب التوصيل قيد المراجعة";
+        } else if (error.message.includes('rejected')) {
+          errorMessage = "تم رفض طلب التوصيل";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "خطأ في تسجيل الدخول",
-        description: error instanceof Error ? error.message : "حدث خطأ غير متوقع",
+        description: errorMessage,
         className: "bg-destructive text-destructive-foreground"
       });
     } finally {
@@ -157,9 +251,11 @@ const login = useGoogleLogin({
                     className="pr-10"
                     placeholder="أدخل رقم الهاتف"
                     required
+                    disabled={isLoading || isGoogleLoading}
                   />
                 </div>
               </div>
+              
               <div>
                 <Label htmlFor="password">كلمة المرور</Label>
                 <div className="relative">
@@ -172,6 +268,7 @@ const login = useGoogleLogin({
                     className="pr-10"
                     placeholder="أدخل كلمة المرور"
                     required
+                    disabled={isLoading || isGoogleLoading}
                   />
                 </div>
               </div>
@@ -185,26 +282,39 @@ const login = useGoogleLogin({
                 </Link>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading || isGoogleLoading}
+              >
                 {isLoading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
                 <ArrowRight className="mr-2 h-4 w-4" />
               </Button>
-              {/* <GoogleLogin
-                onSuccess={credentialResponse => {
-                  console.log(credentialResponse);
-                  login()
-                }}
-                onError={() => {
-                  console.log('Login Failed');
-                }}
-              /> */}
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">أو</span>
+                </div>
+              </div>
+
               <Button 
-                className='bg-white text-black w-full' 
+                type="button"
+                variant="outline"
+                className="w-full" 
                 onClick={() => login()}
-                disabled={isLoading}
+                disabled={isLoading || isGoogleLoading}
               >
-                {isLoading ? 'جاري تسجيل الدخول...' : 'Sign in with Google'}
-                <img width="30" height="30" src="https://img.icons8.com/fluency/48/google-logo.png" alt="google-logo"/>
+                {isGoogleLoading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول بجوجل'}
+                <img 
+                  width="20" 
+                  height="20" 
+                  src="https://img.icons8.com/fluency/48/google-logo.png" 
+                  alt="google-logo" 
+                  className="ml-2"
+                />
               </Button>
             </form>
             

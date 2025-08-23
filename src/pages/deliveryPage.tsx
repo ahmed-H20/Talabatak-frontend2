@@ -29,6 +29,8 @@ import {
   LogOut,
   Settings
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 // API configuration
 const API_BASE_URL = 'http://localhost:5000/api';
@@ -107,6 +109,7 @@ const mockData = {
   }
 };
 
+
 // API helper with proper error handling
 const apiCall = async (endpoint, options = {}) => {
   const token = getAuthToken();
@@ -148,6 +151,7 @@ const apiCall = async (endpoint, options = {}) => {
     throw error;
   }
 };
+
 
 // Mock data fallback helper
 const getMockDataForEndpoint = (endpoint) => {
@@ -663,21 +667,12 @@ const DeliveryDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    // Just clear user data, don't remove token
-    setUser({ name: '', role: '' });
-    setAvailableOrders([]);
-    setMyOrders([]);
-    setStats({
-      totalOrders: 0,
-      deliveredOrders: 0,
-      totalEarnings: 0,
-      rating: 0,
-      todayOrders: 0,
-      onlineTime: '0:00',
-      averageDeliveryTime: 0
-    });
-    setError('تم تسجيل الخروج');
+  const {logout} = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/auth/login');
   };
 
   // Show loading screen during initialization
@@ -770,7 +765,7 @@ const DeliveryDashboard = () => {
 
         {/* Stats Cards */}
         <div className="px-4 py-4 bg-gradient-to-r from-blue-50 to-purple-50">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="text-center">
               <div className="text-lg font-bold text-gray-900">{stats.todayOrders}</div>
               <div className="text-xs text-gray-600">اليوم</div>
@@ -786,10 +781,10 @@ const DeliveryDashboard = () => {
               </div>
               <div className="text-xs text-gray-600">التقييم</div>
             </div>
-            <div className="text-center">
+            {/* <div className="text-center">
               <div className="text-lg font-bold text-purple-600">{stats.onlineTime}</div>
               <div className="text-xs text-gray-600">اونلاين</div>
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -982,8 +977,8 @@ const DeliveryDashboard = () => {
                       </div>
                       <a
                         href={getGoogleMapsLink(
-                          order.deliveryLocation.coordinates[1],
-                          order.deliveryLocation.coordinates[0]
+                          order.deliveryLocation.coordinates[0],
+                          order.deliveryLocation.coordinates[1]
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -1103,7 +1098,7 @@ const DeliveryDashboard = () => {
                         <Truck className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="text-sm font-semibold">طلبي #{order._id.slice(-6)}</div>
+                        <div className="text-sm font-semibold">طلب #{order._id.slice(-8)}</div>
                         <div className="text-xs opacity-90">{formatTime(order.order.createdAt)}</div>
                       </div>
                     </div>
@@ -1175,8 +1170,8 @@ const DeliveryDashboard = () => {
                       </div>
                       <a
                         href={getGoogleMapsLink(
-                          order.order.deliveryLocation.coordinates[1],
-                          order.order.deliveryLocation.coordinates[0]
+                          order.order.deliveryLocation.coordinates[0],
+                          order.order.deliveryLocation.coordinates[1]
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -1225,12 +1220,12 @@ const DeliveryDashboard = () => {
                   {order.order.status !== 'delivered' && (
                     <div className="space-y-2">
                       {order.order.status === 'assigned_to_delivery' && (
-                        <div className="grid grid-cols-2 gap-2">
+                        
                           <Button 
                             onClick={() => updateStatus(order.order._id, 'picked_up')}
                             disabled={loadingAction === `status-${order.order._id}`}
                             variant="outline"
-                            className="h-11 text-sm"
+                            className="w-full h-11 text-sm"
                           >
                             {loadingAction === `status-${order.order._id}` ? (
                               <Loader2 className="h-4 w-4 animate-spin ml-2" />
@@ -1238,8 +1233,7 @@ const DeliveryDashboard = () => {
                               <Clock className="h-4 w-4 ml-2" />
                             )}
                             تم الاستلام من المتجر
-                          </Button>                          
-                        </div>
+                          </Button> 
                       )}
 
                       {order.order.status === 'picked_up' && (

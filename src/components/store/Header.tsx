@@ -27,9 +27,9 @@ interface DetailedAddress {
 
 // cities
 const CITIES = [
-  { name: 'الرياض', lat: 24.7136, lon: 46.6753 },
-  { name: 'جدة', lat: 21.4858, lon: 39.1925 },
-  { name: 'الدمام', lat: 26.4207, lon: 50.0888 },
+  // { name: 'الرياض', lat: 24.7136, lon: 46.6753 },
+  // { name: 'جدة', lat: 21.4858, lon: 39.1925 },
+  // { name: 'الدمام', lat: 26.4207, lon: 50.0888 },
   { name: "القاهرة", lat: 30.0444, lon: 31.2357 },
   { name: "الاسكندرية", lat: 31.2156, lon: 29.9553 },
   { name: "المنصورة", lat: 31.0375, lon: 31.3784 },

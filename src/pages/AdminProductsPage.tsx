@@ -920,7 +920,7 @@ const AdminProductsPage = () => {
           discountedPrice: 23.39,
           store: { name: 'متجر تجريبي' },
           category: { name: 'فئة تجريبية' },
-          images: ['📦']
+          images: []
         }
       ]);
     } finally {
@@ -999,7 +999,7 @@ const AdminProductsPage = () => {
         store: formData.store,
         category: formData.category,
         subCategory: formData.subCategory || null,
-        images: formData.images.length > 0 ? formData.images : [{ url: '📦' }]
+        images: formData.images.length > 0 ? formData.images : []
       };
 
       let response;

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 export interface User {
   _id: string;
@@ -14,13 +14,18 @@ export interface User {
   photo?: string;
   provider?: 'local' | 'google' | 'facebook';
   providerId?: string;
+  profileComplete?: boolean;
+  deliveryStatus?: 'pending' | 'approved' | 'rejected' | 'suspended';
+  deliveryInfo;
 }
 
 export interface AuthResponse {
   message: string;
   user: User;
   token?: string;
+  role?: string;
   isNewUser?: boolean;
+  needsProfileCompletion?: boolean;
 }
 
 export interface RegisterData {
@@ -30,14 +35,6 @@ export interface RegisterData {
   password: string;
   location: string;
   role: "user" | "delivery" | "admin";
-}
-
-export interface SocialAuthData {
-  name: string;
-  email: string;
-  photo?: string;
-  providerId: string;
-  provider: 'google' | 'facebook';
 }
 
 // Helper function to validate phone number (11 digits)
@@ -77,149 +74,13 @@ class AuthService {
     if (result.token) {
       localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
+      localStorage.setItem('authMethod', 'regular');
     }
     
     return result;
   }
 
-  // // Google Authentication
-  // async googleAuth(): Promise<AuthResponse> {
-  //   return new Promise((resolve, reject) => {
-  //     // Load Google Sign-In API
-  //     if (!window.google) {
-  //       reject(new Error('Google Sign-In API not loaded'));
-  //       return;
-  //     }
-
-  //     window.google.accounts.oauth2.initTokenClient({
-  //       client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID',
-  //       scope: 'email profile',
-  //       callback: async (response) => {
-  //         try {
-  //           if (response.error) {
-  //             reject(new Error(response.error));
-  //             return;
-  //           }
-
-  //           // Get user info from Google
-  //           const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-  //             headers: {
-  //               Authorization: `Bearer ${response.access_token}`,
-  //             },
-  //           });
-
-  //           const userInfo = await userInfoResponse.json();
-
-  //           // Send to backend
-  //           const authResponse = await fetch(`${API_BASE_URL}/auth/google`, {
-  //             method: 'POST',
-  //             headers: { 'Content-Type': 'application/json' },
-  //             body: JSON.stringify({
-  //               providerId: userInfo.id,
-  //               name: userInfo.name,
-  //               email: userInfo.email,
-  //               photo: userInfo.picture,
-  //             }),
-  //           });
-
-  //           if (!authResponse.ok) {
-  //             const error = await authResponse.json();
-  //             throw new Error(error.message || 'Google authentication failed');
-  //           }
-
-  //           const result = await authResponse.json();
-            
-  //           if (result.token) {
-  //             localStorage.setItem('token', result.token);
-  //             localStorage.setItem('user', JSON.stringify(result.user));
-  //           }
-            
-  //           resolve(result);
-  //         } catch (error) {
-  //           reject(error);
-  //         }
-  //       },
-  //     }).requestAccessToken();
-  //   });
-  // }
-
-  // // Facebook Authentication
-  // async facebookAuth(): Promise<AuthResponse> {
-  //   return new Promise((resolve, reject) => {
-  //     // Check if Facebook SDK is loaded
-  //     if (!window.FB) {
-  //       reject(new Error('Facebook SDK not loaded'));
-  //       return;
-  //     }
-
-  //     window.FB.login((response) => {
-  //       if (response.authResponse) {
-  //         // Get user info from Facebook
-  //         window.FB.api('/me', { fields: 'name,email,picture' }, async (userInfo) => {
-  //           try {
-  //             // Send to backend
-  //             const authResponse = await fetch(`${API_BASE_URL}/auth/facebook`, {
-  //               method: 'POST',
-  //               headers: { 'Content-Type': 'application/json' },
-  //               body: JSON.stringify({
-  //                 providerId: userInfo.id,
-  //                 name: userInfo.name,
-  //                 email: userInfo.email,
-  //                 photo: userInfo.picture?.data?.url,
-  //               }),
-  //             });
-
-  //             if (!authResponse.ok) {
-  //               const error = await authResponse.json();
-  //               throw new Error(error.message || 'Facebook authentication failed');
-  //             }
-
-  //             const result = await authResponse.json();
-              
-  //             if (result.token) {
-  //               localStorage.setItem('token', result.token);
-  //               localStorage.setItem('user', JSON.stringify(result.user));
-  //             }
-              
-  //             resolve(result);
-  //           } catch (error) {
-  //             reject(error);
-  //           }
-  //         });
-  //       } else {
-  //         reject(new Error('Facebook login cancelled'));
-  //       }
-  //     }, { scope: 'email' });
-  //   });
-  // }
-
-  // Complete social profile (for new social users)
-  async completeSocialProfile(data: {
-    phone: string;
-    address: string;
-    role: 'user' | 'delivery';
-    location: { coordinates: [number, number]; address: string };
-  }): Promise<AuthResponse> {
-    if (!isValidPhone(data.phone)) {
-      throw new Error('Phone number must be exactly 11 digits');
-    }
-
-    const response = await fetch(`${API_BASE_URL}/auth/complete-social-profile`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Profile completion failed');
-    }
-
-    const result = await response.json();
-    localStorage.setItem('user', JSON.stringify(result.user));
-    return result;
-  }
-
+  // Regular login with phone/password
   async login(phone: string, password: string): Promise<AuthResponse> {
     if (!isValidPhone(phone)) {
       throw new Error('Phone number must be exactly 11 digits');
@@ -240,17 +101,97 @@ class AuthService {
     if (result.token) {
       localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
+      localStorage.setItem('authMethod', 'regular');
     }    
     return result;
   }
 
-  async getProfile(): Promise<{ user: User }> {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
+  // Google Authentication - Properly integrated with backend
+  async googleAuth(googleUserData: {
+    sub: string;
+    name: string;
+    email: string;
+    picture?: string;
+  }): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId: googleUserData.sub,
+          name: googleUserData.name,
+          email: googleUserData.email,
+          photo: googleUserData.picture,
+          provider: 'google'
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Google authentication failed');
       }
+
+      const result = await response.json();
+      
+      if (result.token) {
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        localStorage.setItem('authMethod', 'google');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Google auth failed:', error);
+      throw error;
+    }
+  }
+
+  // Complete social profile
+  async completeSocialProfile(profileData) {
+    try {
+      const response = await fetch('/api/v1/auth/complete-social-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: JSON.stringify(profileData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Profile completion failed');
+      }
+
+      // IMPORTANT: Store the new token returned from backend
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        // Also store updated user data
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Profile completion error:', error);
+      throw error;
+    }
+  }
+
+  getCurrentUser() {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  }
+
+  getToken() {
+    return localStorage.getItem('token');
+  }
+
+  async getProfile(): Promise<{ user: User }> {
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      headers: this.getAuthHeaders()
     });
 
     if (!response.ok) {
@@ -298,110 +239,109 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
-    await fetch(`${API_BASE_URL}/auth/logout`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-    });
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+      });
+    } catch (error) {
+      console.error('Logout request failed:', error);
+    }
     
+    // Always clean up localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('authMethod');
+    localStorage.removeItem('isGoogleAuth'); // Remove Google auth flag
   }
 
-  getCurrentUser(): User | null {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
-  }
+  // getCurrentUser(): User | null {
+  //   const userStr = localStorage.getItem('user');
+  //   if (!userStr) return null;
+    
+  //   try {
+  //     return JSON.parse(userStr);
+  //   } catch (error) {
+  //     console.error('Error parsing user data:', error);
+  //     return null;
+  //   }
+  // }
 
   isAuthenticated(): boolean {
-  const token = localStorage.getItem('token');
-  const googleUser = localStorage.getItem('user');
-  
-  // Check for regular token OR Google authentication
-  return !!(token || (googleUser && JSON.parse(googleUser).provider === 'google'));
-}
-
-getCurrentUser(): User | null {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
+    const token = localStorage.getItem('token');
+    const user = this.getCurrentUser();
+    const isGoogleAuth = localStorage.getItem('isGoogleAuth');
     
+    // For Google auth, we need to check if the temporary session is valid
+    if (isGoogleAuth === 'true') {
+      return !!(token && user && token.startsWith('google_'));
+    }
+    
+    // For regular auth, check normal token and user
+    return !!(token && user && !token.startsWith('google_'));
+  }
+
+  // Check if user needs to complete profile
+  needsProfileCompletion(): boolean {
+    const user = this.getCurrentUser();
+    return !!(user && user.provider === 'google' && !user.profileComplete);
+  }
+
+  // Check if current session is Google-based
+  isGoogleUser(): boolean {
+    const user = this.getCurrentUser();
+    const isGoogleAuth = localStorage.getItem('isGoogleAuth');
+    return !!(user && (user.provider === 'google' || isGoogleAuth === 'true'));
+  }
+
+  // Get user role
+  getUserRole(): "user" | "delivery" | "admin" | null {
+    const user = this.getCurrentUser();
+    return user?.role || null;
+  }
+
+  // Check if user session is still valid
+  isSessionValid(): boolean {
+    return this.isAuthenticated();
+  }
+
+  // Restore session on app load
+  initializeAuth(): boolean {
     try {
-      const user = JSON.parse(userStr);
-      return user;
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+
+      if (token && user) {
+        JSON.parse(user); // Will throw if invalid JSON
+        return true;
+      }
+      
+      return false;
     } catch (error) {
-      console.error('Error parsing user data:', error);
-      return null;
+      this.clearSession();
+      return false;
     }
   }
 
-  // Updated logout to handle Google auth cleanup
-  async logout(): Promise<void> {
-    const isGoogleAuth = localStorage.getItem('isGoogleAuth');
-    
-    // If it's a regular backend session, call backend logout
-    if (!isGoogleAuth) {
-      try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: this.getAuthHeaders(),
-        });
-      } catch (error) {
-        console.error('Logout request failed:', error);
-        // Continue with local cleanup even if backend call fails
-      }
-    }
-    
-    // Clean up all auth-related localStorage items
+  // Clear session data
+  private clearSession(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('authMethod');
     localStorage.removeItem('isGoogleAuth');
   }
 
-  // Method to check if user needs to complete profile (for Google users)
-  needsProfileCompletion(): boolean {
+  // Check if delivery person is approved
+  isApprovedDelivery(): boolean {
     const user = this.getCurrentUser();
-    return !!(user && user.provider === 'google' && !user.phone);
+    return !!(user && user.role === 'delivery' && user.deliveryStatus === 'approved');
   }
 
-  // Future method for when backend Google endpoint is ready
-  async googleAuthWithBackend(googleUserData: {
-    providerId: string;
-    name: string;
-    email: string;
-    photo?: string;
-  }): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/google`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...googleUserData,
-        provider: 'google'
-      }),
-    });
-
-    // Check if response is JSON
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const textResponse = await response.text();
-      console.error('Non-JSON response:', textResponse);
-      throw new Error('Server endpoint not available yet');
-    }
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Google authentication failed');
-    }
-
-    const result = await response.json();
-    
-    if (result.token) {
-      localStorage.setItem('token', result.token);
-      localStorage.setItem('user', JSON.stringify(result.user));
-      localStorage.removeItem('isGoogleAuth'); // Remove temp flag
-    }
-    
-    return result;
+  // Get delivery status
+  getDeliveryStatus(): string | null {
+    const user = this.getCurrentUser();
+    return user?.deliveryStatus || null;
   }
-
 }
 
 export const authService = new AuthService();
