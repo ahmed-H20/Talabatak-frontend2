@@ -83,7 +83,10 @@ const StorePage = () => {
   console.log(products)
   const { location } = useLocation();
   const token = localStorage.getItem("token");
+  
+  const currentLocation = localStorage.getItem("userLocation") ? JSON.parse(localStorage.getItem("userLocation") || '{}') : null;
 
+  console.log("Current Location:", currentLocation);  
   // Enhanced fetch with better error handling and loading states
   const fetchProducts = useCallback(async () => {
     if (!location?.lat || !location?.lon) {
@@ -94,9 +97,8 @@ const StorePage = () => {
     try {
       setLoading(true);
       setError(null);
-      
       const response = await fetch(
-        `https://talabatak-backend2.vercel.app/api/stores/nearby?lat=${location.lat}&lng=${location.lon}`,
+        `https://talabatak-backend2.vercel.app/api/stores/nearby?lat=${currentLocation?.lat}&lng=${currentLocation?.lon}`,
         {
           method: 'GET',
           headers: {
@@ -198,29 +200,29 @@ const StorePage = () => {
     }
   }, [token, toast]);
 
-  const fetchCart = useCallback(async () => {
-    if (!token) return; // Don't fetch cart if user is not authenticated
+  // const fetchCart = useCallback(async () => {
+  //   if (!token) return; // Don't fetch cart if user is not authenticated
 
-    try {
-      const response = await fetch(`https://talabatak-backend2.vercel.app/api/cart/cartUser`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  //   try {
+  //     const response = await fetch(`https://talabatak-backend2.vercel.app/api/cart/cartUser`, {
+  //       method: 'GET',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         Authorization: `Bearer ${token}`,
+  //       },
+  //     });
 
-      if (!response.ok) {
-        throw new Error('فشل في تحميل السلة');
-      }
+  //     if (!response.ok) {
+  //       throw new Error('فشل في تحميل السلة');
+  //     }
 
-      const data = await response.json();
-      setCartItems(data);
-    } catch (error) {
-      console.error('Error fetching cart:', error);
-      // Don't show toast for cart errors as it's not critical
-    }
-  }, [token]);
+  //     const data = await response.json();
+  //     setCartItems(data);
+  //   } catch (error) {
+  //     console.error('Error fetching cart:', error);
+  //     // Don't show toast for cart errors as it's not critical
+  //   }
+  // }, [token]);
 
   // Enhanced add to cart with API integration
   const handleAddToCart = async (product: APIProduct) => {
@@ -328,8 +330,8 @@ const StorePage = () => {
   // Fetch data when component mounts or location changes
   useEffect(() => {
     fetchCategories();
-    fetchCart();
-  }, [fetchCategories, fetchCart]);
+    // fetchCart();
+  }, [fetchCategories]);
 
   useEffect(() => {
     if (location) {
