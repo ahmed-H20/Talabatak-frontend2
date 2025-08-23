@@ -101,7 +101,15 @@ const OrdersPage = () => {
         
         // Update the specific order in the list
         setOrders(prev => prev.map(order => 
-          order._id === updatedOrder._id ? { ...order, status: updatedOrder.status } : order
+          order._id === updatedOrder._id ? { 
+            ...order, 
+            status: updatedOrder.status,
+            assignedDeliveryPerson: updatedOrder.assignedDeliveryPerson,
+            assignedAt: updatedOrder.assignedAt,
+            failureReason: updatedOrder.failureReason,
+            // Add any other fields that might be updated
+            updatedAt: updatedOrder.updatedAt
+          } : order
         ));
         
         // Show notification based on status
