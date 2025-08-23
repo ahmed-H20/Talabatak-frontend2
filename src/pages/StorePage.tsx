@@ -200,29 +200,29 @@ const StorePage = () => {
     }
   }, [token, toast]);
 
-  // const fetchCart = useCallback(async () => {
-  //   if (!token) return; // Don't fetch cart if user is not authenticated
+  const fetchCart = useCallback(async () => {
+    if (!token) return; // Don't fetch cart if user is not authenticated
 
-  //   try {
-  //     const response = await fetch(`https://talabatak-backend2.vercel.app/api/cart/cartUser`, {
-  //       method: 'GET',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     });
+    try {
+      const response = await fetch(`https://talabatak-backend2.vercel.app/api/cart/cartUser`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-  //     if (!response.ok) {
-  //       throw new Error('فشل في تحميل السلة');
-  //     }
+      if (!response.ok) {
+        throw new Error('فشل في تحميل السلة');
+      }
 
-  //     const data = await response.json();
-  //     setCartItems(data);
-  //   } catch (error) {
-  //     console.error('Error fetching cart:', error);
-  //     // Don't show toast for cart errors as it's not critical
-  //   }
-  // }, [token]);
+      const data = await response.json();
+      setCartItems(data);
+    } catch (error) {
+      console.error('Error fetching cart:', error);
+      // Don't show toast for cart errors as it's not critical
+    }
+  }, [token]);
 
   // Enhanced add to cart with API integration
   const handleAddToCart = async (product: APIProduct) => {
@@ -235,6 +235,7 @@ const StorePage = () => {
       return;
     }
     try {
+      console.log(product._id)
         setLoading(true);
         const response = await fetch(`https://talabatak-backend2.vercel.app/api/cart/addCartItem`, {
           method: 'POST',
@@ -330,8 +331,8 @@ const StorePage = () => {
   // Fetch data when component mounts or location changes
   useEffect(() => {
     fetchCategories();
-    // fetchCart();
-  }, [fetchCategories]);
+    fetchCart();
+  }, [fetchCategories, fetchCart]);
 
   useEffect(() => {
     if (location) {
