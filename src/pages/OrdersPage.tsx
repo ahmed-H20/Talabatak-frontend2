@@ -137,7 +137,7 @@ const OrdersPage = () => {
     try {
       // Import socket.io-client dynamically to avoid SSR issues
       import('socket.io-client').then(({ io }) => {
-        socketInstance = io('http://localhost:5000', {
+        socketInstance = io('https://talabatak-backend2.vercel.app', {
           auth: {
             token: token
           },
@@ -317,7 +317,7 @@ const OrdersPage = () => {
       setLoading(true);
       console.log('📡 Fetching orders...');
       
-      const res = await fetch('http://localhost:5000/api/orders/', {
+      const res = await fetch('https://talabatak-backend2.vercel.app/api/orders/', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -375,7 +375,7 @@ const OrdersPage = () => {
     try {
       setSubmittingRating(true);
       
-      const res = await fetch(`http://localhost:5000/api/delivery/rate/${orderId}`, {
+      const res = await fetch(`https://talabatak-backend2.vercel.app/api/delivery/rate/${orderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -442,7 +442,7 @@ const OrdersPage = () => {
     try {
       const reason = window.prompt('سبب الإلغاء (اختياري):') || '';
       
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/cancel`, {
+      const res = await fetch(`https://talabatak-backend2.vercel.app/api/orders/${orderId}/cancel`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -497,7 +497,7 @@ const OrdersPage = () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/update`, {
+      const res = await fetch(`https://talabatak-backend2.vercel.app/api/orders/${orderId}/update`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

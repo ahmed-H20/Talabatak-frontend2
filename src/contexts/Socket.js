@@ -2,7 +2,7 @@
 import { io } from 'socket.io-client';
 
 useEffect(() => {
-  const socket = io('http://localhost:5000');
+  const socket = io('https://talabatak-backend2.vercel.app');
   
   socket.on('orderCreated', (orderData) => {
     toast({
