@@ -33,7 +33,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 // API configuration
-const API_BASE_URL = 'https://talabatak-backend2.vercel.app/api';
+const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
 
 // Auth helpers
 const getAuthToken = () => {

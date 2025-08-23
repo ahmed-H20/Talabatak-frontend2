@@ -242,7 +242,7 @@ const AdminOrdersPage = () => {
   useEffect(() => {
     const token = getAuthToken();
     if (token) {
-      const socketInstance = io('https://talabatak-backend2.vercel.app', {
+      const socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
         auth: {
           token: token
         }
@@ -329,7 +329,7 @@ const AdminOrdersPage = () => {
     try {
       setLoading(true);
       const token = getAuthToken();
-      const response = await fetch('https://talabatak-backend2.vercel.app/api/orders/all', {
+      const response = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/all', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -360,7 +360,7 @@ const AdminOrdersPage = () => {
       setUpdatingStatus(orderId);
       const token = getAuthToken();
       
-      const response = await fetch(`https://talabatak-backend2.vercel.app/api/orders/${orderId}/status`, {
+      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -591,7 +591,7 @@ import { BaseLayout } from '@/components/layout/BaseLayout';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
 // API Configuration
-const API_BASE_URL = 'https://talabatak-backend2.vercel.app/api';
+const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
 
 // API Service with proper backend integration
 const apiService = {

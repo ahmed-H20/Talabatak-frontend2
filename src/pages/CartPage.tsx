@@ -58,7 +58,7 @@ const CartPage = () => {
   // Initialize Socket.IO connection
   useEffect(() => {
     if (user && token) {
-      const socketConnection = io('https://talabatak-backend2.vercel.app', {
+      const socketConnection = io('https://talabatak-backend2-zw4i.onrender.com', {
         auth: {
           token: token
         }
@@ -133,7 +133,7 @@ const createOrder = async () => {
 
     console.log('Creating order with data:', orderData);
 
-    const response = await fetch('https://talabatak-backend2.vercel.app/api/orders/', {
+    const response = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -179,7 +179,7 @@ const createOrder = async () => {
 
     try {
       setIsApplying(true);
-      const res = await fetch(`https://talabatak-backend2.vercel.app/api/coupons/useCoupon`, {
+      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/coupons/useCoupon`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -208,7 +208,7 @@ const createOrder = async () => {
   
   const fetchCart = async () => {    
     try {
-      const response = await fetch(`https://talabatak-backend2.vercel.app/api/cart/cartUser`, {
+      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/cartUser`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -258,7 +258,7 @@ const createOrder = async () => {
 
   try {
     // ✅ Call API to update quantity in backend
-    const res = await fetch(`https://talabatak-backend2.vercel.app/api/cart/updateCartItem/${id}`, {
+    const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/updateCartItem/${id}`, {
       method:  "PUT",
       headers: { 
         "Content-Type": "application/json" ,
@@ -285,7 +285,7 @@ const createOrder = async () => {
     console.log(id)
     try {
     // ✅ Call API to delete in backend
-    const res = await fetch(`https://talabatak-backend2.vercel.app/api/cart/deletecart/${id}`, {
+    const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/cart/deletecart/${id}`, {
       method:  "DELETE",
       headers: { 
         "Content-Type": "application/json" ,
