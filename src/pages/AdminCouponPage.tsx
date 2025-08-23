@@ -64,7 +64,7 @@ const AdminCouponsPage = () => {
   // Fetch coupons
   const fetchCoupons = async () => {
     try {
-      const res = await fetch('https://talabatak-backend2.vercel.app/api/coupons/getCoupons', {
+      const res = await fetch('http://localhost:5000/api/coupons/getCoupons', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -87,7 +87,7 @@ const AdminCouponsPage = () => {
   // Fetch stores
   const fetchStores = async () => {
     try {
-      const res = await fetch('https://talabatak-backend2.vercel.app/api/stores', {
+      const res = await fetch('http://localhost:5000/api/stores', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -117,8 +117,8 @@ const AdminCouponsPage = () => {
     
     try {
       const url = editingCoupon 
-        ? `https://talabatak-backend2.vercel.app/api/coupons/update/${editingCoupon.id}`
-        : 'https://talabatak-backend2.vercel.app/api/coupons/create';
+        ? `http://localhost:5000/api/coupons/update/${editingCoupon.id}`
+        : 'http://localhost:5000/api/coupons/create';
       
       const method = editingCoupon ? 'PUT' : 'POST';
       
@@ -170,7 +170,7 @@ const AdminCouponsPage = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`https://talabatak-backend2.vercel.app/api/coupons/delete/${id}`, {
+      const res = await fetch(`http://localhost:5000/api/coupons/delete/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
