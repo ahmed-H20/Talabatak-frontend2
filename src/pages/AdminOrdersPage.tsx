@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Bell,
   Volume2,
-  VolumeX
+  VolumeX,
+  Truck
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { useToast } from '@/hooks/use-toast';
@@ -60,7 +61,7 @@ interface Order {
   deliveryFee: number;
   totalPrice: number;
   discountAmount: number;
-  status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'rejected';
+  status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'rejected' | 'assigned_to_delivery' | 'on_the_way';
   deliveryLocation: GeoPoint;
   storeLocation: GeoPoint;
   createdAt: string;
@@ -238,11 +239,14 @@ const AdminOrdersPage = () => {
     return localStorage.getItem('token');
   };
 
+    console.log('📦 Orders:', orders);
+
+
   // Initialize Socket.IO connection
   useEffect(() => {
     const token = getAuthToken();
     if (token) {
-      const socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
+      const socketInstance = io('http://localhost:5000', {
         auth: {
           token: token
         }
@@ -329,7 +333,7 @@ const AdminOrdersPage = () => {
     try {
       setLoading(true);
       const token = getAuthToken();
-      const response = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/all', {
+      const response = await fetch('http://localhost:5000/api/orders/all', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -337,7 +341,8 @@ const AdminOrdersPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch orders');
+        const data = await response.json();
+        throw new Error(data.message || 'فشل في جلب الطلبات لست ادمن');
       }
 
       const data = await response.json();      
@@ -346,7 +351,7 @@ const AdminOrdersPage = () => {
       console.error('Error fetching orders:', error);
       toast({
         title: 'خطأ',
-        description: 'فشل في تحميل الطلبات',
+        description: error.message || 'فشل في جلب الطلبات لست ادمن',
         variant: 'destructive',
       });
     } finally {
@@ -360,7 +365,7 @@ const AdminOrdersPage = () => {
       setUpdatingStatus(orderId);
       const token = getAuthToken();
       
-      const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/status`, {
+      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -370,7 +375,9 @@ const AdminOrdersPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update order status');
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to update order status');
+
       }
 
       toast({
@@ -382,7 +389,7 @@ const AdminOrdersPage = () => {
       console.error('Error updating order status:', error);
       toast({
         title: 'خطأ',
-        description: 'فشل في تحديث حالة الطلب',
+        description: error.message || 'فشل ليس لديك صلاحيات كافية لتحديث حالة الطلب',
         variant: 'destructive',
       });
     } finally {
@@ -416,7 +423,8 @@ const AdminOrdersPage = () => {
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'processing': return <ShoppingCart className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'cancelled': 
+      case 'cancelled': return <XCircle className="h-4 w-4" />;
+      case 'picked_up': return <Truck className="h-4 w-4" />;
       case 'rejected': return <XCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
@@ -429,6 +437,11 @@ const AdminOrdersPage = () => {
       case 'delivered': return 'تم التسليم';
       case 'cancelled': return 'ملغي';
       case 'rejected': return 'مرفوض';
+      case 'assigned_to_delivery': return 'تم تعيينه للمندوب';
+      case 'on_the_way': return 'في الطريق';
+      case 'out_for_delivery': return 'خارج للتوصيل';
+      case 'delivery_failed': return 'لايوجد مندوب للتوصيل (ملغى)';
+      case 'picked_up': return 'تم الاستلام من المتجر';
       default: return 'غير معروف';
     }
   };
@@ -438,8 +451,13 @@ const AdminOrdersPage = () => {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'processing': return 'bg-blue-100 text-blue-800';
       case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': 
+      case 'cancelled': return 'bg-gray-100 text-gray-800';
       case 'rejected': return 'bg-red-100 text-red-800';
+      case 'assigned_to_delivery': return 'bg-orange-100 text-orange-800';
+      case 'on_the_way': return 'bg-blue-100 text-blue-800';
+      case 'out_for_delivery': return 'bg-purple-100 text-purple-800';
+      case 'delivery_failed': return 'bg-red-100 text-red-800';
+      case 'picked_up': return 'bg-teal-100 text-teal-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };

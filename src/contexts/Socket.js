@@ -2,7 +2,7 @@
 import { io } from 'socket.io-client';
 
 useEffect(() => {
-  const socket = io('https://talabatak-backend2-zw4i.onrender.com');
+  const socket = io('http://localhost:5000');
   
   socket.on('orderCreated', (orderData) => {
     toast({

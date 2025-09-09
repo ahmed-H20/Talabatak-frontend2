@@ -12,13 +12,16 @@ import {
   XCircle,
   MapPin,
   Bell,
-  LogOut
+  LogOut,
+  Bike,
+  Truck
 } from 'lucide-react';
 import { BaseLayout } from '@/components/layout/BaseLayout';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { toast } from 'sonner';
 
 // API Configuration
-const API_BASE_URL = 'https://talabatak-backend2-zw4i.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // API Service Functions
 const apiService = {
@@ -33,7 +36,9 @@ const apiService = {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to fetch orders');
+      const data = await response.json();
+      toast.error(data.message || 'خطأ في جلب الطلبات');
+      throw new Error(data.message || 'Failed to fetch orders');      
     }
     
     return response.json();
@@ -51,7 +56,9 @@ const apiService = {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to update order status');
+      const data = await response.json();
+      toast.error(data.message || 'خطأ في تحديث حالة الطلب');
+      throw new Error(data.message || 'Failed to update order status');
     }
     
     return response.json();
@@ -62,7 +69,9 @@ const apiService = {
     const response = await fetch(`${API_BASE_URL}/products`);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch products');
+      const data = await response.json();
+      toast.error(data.message || 'خطأ في جلب المنتجات');
+      throw new Error(data.message || 'Failed to fetch products');
     }
     
     return response.json();
@@ -73,7 +82,9 @@ const apiService = {
     const response = await fetch(`${API_BASE_URL}/categories`);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch categories');
+      const data = await response.json();
+      toast.error(data.message || 'خطأ في جلب الفئات');
+      throw new Error(data.message || 'Failed to fetch categories');
     }
     
     return response.json();
@@ -84,7 +95,9 @@ const apiService = {
     const response = await fetch(`${API_BASE_URL}/stores`);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch stores');
+      const data = await response.json();
+      toast.error(data.message || 'خطأ في جلب المتاجر');
+      throw new Error(data.message || 'Failed to fetch stores');
     }
     
     return response.json();
@@ -159,7 +172,7 @@ const AdminDashboardPage = () => {
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      setError('خطأ في تحميل البيانات من الخادم');
+      toast.error(error.message || 'خطأ في تحميل البيانات من الخادم');
       setLoading(false);
     }
   };
@@ -182,6 +195,7 @@ const AdminDashboardPage = () => {
       
     } catch (error) {
       console.error('Error updating order status:', error);
+      toast.error(error.message || 'خطأ في تحديث حالة الطلب');
       setError('خطأ في تحديث حالة الطلب');
     }
   };
@@ -194,9 +208,14 @@ const AdminDashboardPage = () => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'pending': return <Clock className="h-4 w-4" />;
-      case 'processing': return <Package className="h-4 w-4" />;
+      case 'processing': return <Clock className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
       case 'cancelled': return <XCircle className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
+      case 'assigned_to_delivery': return <Clock className="h-4 w-4" />;
+      case 'on_the_way': return <Bike className="h-4 w-4" />;
+      case 'delivery_failed': return <XCircle className="h-4 w-4" />;
+      case 'picked_up': return <Truck className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
@@ -207,6 +226,11 @@ const AdminDashboardPage = () => {
       case 'processing': return 'قيد المعالجة';
       case 'delivered': return 'تم التسليم';
       case 'cancelled': return 'مرفوض';
+      case 'assigned_to_delivery': return 'تم تعيينه للمندوب';
+      case 'on_the_way': return 'في الطريق';
+      case 'out_for_delivery': return 'خارج للتوصيل';
+      case 'delivery_failed': return 'لايوجد مندوب للتوصيل (ملغى)';
+      case 'picked_up': return 'تم الاستلام من المتجر';
       default: return 'غير معروف';
     }
   };
@@ -217,6 +241,11 @@ const AdminDashboardPage = () => {
       case 'processing': return 'bg-info text-info-foreground';
       case 'delivered': return 'bg-success text-success-foreground';
       case 'cancelled': return 'bg-destructive text-destructive-foreground';
+      case 'rejected': return 'bg-destructive text-destructive-foreground';
+      case 'assigned_to_delivery': return 'bg-info text-info-foreground';
+      case 'on_the_way': return 'bg-info text-info-foreground';
+      case 'out_for_delivery': return 'bg-info text-info-foreground';
+      case 'delivery_failed': return 'bg-destructive text-destructive-foreground';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -424,9 +453,20 @@ const AdminDashboardPage = () => {
                               variant="default"
                               onClick={() => handleOrderStatusUpdate(order._id, 'delivered')}
                             >
-                              تم التسليم
+                              تم التسليم لمناديب التوصيل
                             </Button>
                           )}
+                          {
+                            order.status === 'assigned_to_delivery' && (
+                              <Button 
+                                size="sm" 
+                                variant="default"
+                                onClick={() => handleOrderStatusUpdate(order._id, 'on_the_way')}
+                              >
+                                في الطريق
+                              </Button>
+                            )
+                          }
                         </div>
                       </div>
                     ))

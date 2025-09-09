@@ -1,6 +1,6 @@
 import { BottomNav } from '@/components/store/BottomNav';
 import { Package, Clock, CheckCircle, XCircle, Bell, RefreshCw, MapPin, User, Store, Edit, X, ThumbsUp, Truck, UserCheck, ShoppingBag, Star, Phone } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 
 interface GeoPoint {
   type: "Point";
@@ -105,23 +105,316 @@ const OrdersPage = () => {
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
-  const { toast } = useToast();
+  
+  // Memoize the toast function to prevent recreation on every render
+  const { toast } = useMemo(() => useToast(), []);
 
-  // Get token from localStorage
-  const getToken = () => {
+  // Get token from localStorage - memoized to prevent recreation
+  const getToken = useCallback(() => {
     try {
       return localStorage.getItem("token");
     } catch (error) {
       console.error("Error getting token:", error);
       return null;
     }
-  };
+  }, []);
 
-  // Create Google Maps Link from coordinates
-  const getGoogleMapsLink = (lat: number, lng: number) => {
+  // Create Google Maps Link from coordinates - memoized
+  const getGoogleMapsLink = useCallback((lat: number, lng: number) => {
     if (typeof lat !== 'number' || typeof lng !== 'number') return null;
     return `https://www.google.com/maps?q=${lat},${lng}`;
-  };
+  }, []);
+
+  // Fetch orders function with proper error handling - memoized to prevent infinite loops
+  const fetchOrders = useCallback(async () => {
+    const token = getToken();
+    
+    if (!token) {
+      toast({
+        title: 'خطأ',
+        description: 'لم يتم العثور على رمز المصادقة، يرجى تسجيل الدخول مرة أخرى',
+        variant: 'destructive',
+      });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('📡 Fetching orders...');
+      
+      const res = await fetch('http://localhost:5000/api/orders/', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('انتهت صلاحية جلسة المصادقة، يرجى تسجيل الدخول مرة أخرى');
+        }
+        throw new Error(`HTTP ${res.status}: فشل في تحميل الطلبات`);
+      }
+      
+      const data: ApiResponse = await res.json();
+      console.log('📦 Orders received:', data);
+      
+      // Handle different API response structures
+      let ordersList: Order[] = [];
+      if (data.orders) {
+        ordersList = data.orders;
+      } else if (data.data) {
+        ordersList = data.data;
+      } else if (Array.isArray(data)) {
+        ordersList = data;
+      }
+      
+      setOrders(ordersList);
+      
+    } catch (error: any) {
+      console.error('❌ Error fetching orders:', error);
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل في تحميل الطلبات',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken, toast]); // Only depend on stable functions
+
+  // Rate delivery function - memoized
+  const rateDelivery = useCallback(async (orderId: string, rating: number, feedback: string) => {
+    const token = getToken();
+    
+    if (!token) {
+      toast({
+        title: 'خطأ',
+        description: 'لم يتم العثور على رمز المصادقة',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setSubmittingRating(true);
+      
+      const res = await fetch(`http://localhost:5000/api/delivery/rate/${orderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          rating,
+          feedback
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'فشل في تقييم المندوب');
+      }
+
+      setOrders(prev => prev.map(order => 
+        order._id === orderId ? { 
+          ...order, 
+          customerRating: rating, 
+          customerFeedback: feedback 
+        } : order
+      ));
+
+      toast({
+        title: '✅ تم التقييم بنجاح',
+        description: `تم تقييم مندوب توصيل طلب #${orderId.slice(-8)} بنجاح`,
+        duration: 3000,
+      });
+
+      setSelectedOrderForRating(null);
+      setRating(0);
+      setFeedback('');
+      
+    } catch (error: any) {
+      console.error('❌ Error rating delivery:', error);
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل في تقييم المندوب',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmittingRating(false);
+    }
+  }, [getToken, toast]);
+
+  // Cancel order function - memoized
+  const cancelOrder = useCallback(async (orderId: string) => {
+    if (!window.confirm('هل أنت متأكد من إلغاء هذا الطلب؟')) {
+      return;
+    }
+
+    const token = getToken();
+    
+    if (!token) {
+      toast({
+        title: 'خطأ',
+        description: 'لم يتم العثور على رمز المصادقة',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const reason = window.prompt('سبب الإلغاء (اختياري):') || '';
+      
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/cancel`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'فشل في إلغاء الطلب');
+      }
+
+      setOrders(prev => prev.map(order => 
+        order._id === orderId ? { 
+          ...order, 
+          status: 'cancelled',
+          cancelledAt: new Date().toISOString(),
+          failureReason: reason || 'تم الإلغاء بواسطة العميل'
+        } : order
+      ));
+
+      toast({
+        title: '✅ تم إلغاء الطلب',
+        description: `تم إلغاء طلب #${orderId.slice(-8)} بنجاح`,
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error('❌ Error cancelling order:', error);
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل في إلغاء الطلب',
+        variant: 'destructive',
+      });
+    }
+  }, [getToken, toast]);
+
+  // Update order function - memoized
+  const updateOrder = useCallback(async (orderId: string, order: Order) => {
+    const newAddress = window.prompt('أدخل عنوان التسليم الجديد:', order.deliveryAddress);
+    if (!newAddress) return;
+
+    const token = getToken();
+    
+    if (!token) {
+      toast({
+        title: 'خطأ',
+        description: 'لم يتم العثور على رمز المصادقة',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/update`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          deliveryAddress: newAddress,
+          orderItems: order.orderItems
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'فشل في تحديث الطلب');
+      }
+
+      setOrders(prev => prev.map(order => 
+        order._id === orderId ? { 
+          ...order, 
+          deliveryAddress: newAddress,
+          updatedAt: new Date().toISOString()
+        } : order
+      ));
+
+      toast({
+        title: '✅ تم تحديث الطلب',
+        description: `تم تحديث طلب #${orderId.slice(-8)} بنجاح`,
+        duration: 3000,
+      });
+    } catch (error: any) {
+      console.error('❌ Error updating order:', error);
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل في تحديث الطلب',
+        variant: 'destructive',
+      });
+    }
+  }, [getToken, toast]);
+
+  // Helper functions - memoized
+  const canModifyOrder = useCallback((status: string) => {
+    return status === 'pending';
+  }, []);
+
+  const canRateOrder = useCallback((order: Order) => {
+    return order.status === 'delivered' && !order.customerRating && order.assignedDeliveryPerson;
+  }, []);
+
+  const getStatusIcon = useCallback((status: string) => {
+    switch (status) {
+      case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'processing': return <Clock className="h-4 w-4" />;
+      case 'cancelled': return <XCircle className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
+      case 'pending': return <Package className="h-4 w-4" />;
+      case 'assigned_to_delivery': return <UserCheck className="h-4 w-4" />;
+      case 'picked_up': return <CheckCircle className="h-4 w-4" />;
+      case 'on_the_way': return <Truck className="h-4 w-4" />;
+      default: return <Package className="h-4 w-4" />;
+    }
+  }, []);
+
+  const getStatusText = useCallback((status: string) => {
+    switch (status) {
+      case 'delivered': return 'تم التسليم';
+      case 'processing': return 'قيد المعالجة';
+      case 'cancelled': return 'ملغي';
+      case 'delivery_failed': return 'ملغى (لايوجد مندوب)';
+      case 'rejected': return 'مرفوض';
+      case 'pending': return 'بانتظار المراجعة';
+      case 'assigned_to_delivery': return 'تم تخصيص مندوب';
+      case 'on_the_way': return 'في الطريق إليك';
+      case 'picked_up': return 'تم الاستلام من المتجر';
+      default: return 'جديد';
+    }
+  }, []);
+
+  const getStatusVariant = useCallback((status: string) => {
+    switch (status) {
+      case 'delivered': return 'bg-green-100 text-green-800 border border-green-200';
+      case 'assigned_to_delivery': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'on_the_way': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'processing': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'delivery_failed': return 'bg-red-100 text-red-800 border border-red-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border border-red-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border border-red-200';
+      case 'picked_up': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 border border-gray-200';
+    }
+  }, []);
 
   // Initialize Socket.IO connection with proper error handling
   useEffect(() => {
@@ -134,10 +427,11 @@ const OrdersPage = () => {
 
     let socketInstance: any = null;
     
-    try {
-      // Import socket.io-client dynamically to avoid SSR issues
-      import('socket.io-client').then(({ io }) => {
-        socketInstance = io('https://talabatak-backend2-zw4i.onrender.com', {
+    const initializeSocket = async () => {
+      try {
+        // Import socket.io-client dynamically to avoid SSR issues
+        const { io } = await import('socket.io-client');
+        socketInstance = io('http://localhost:5000', {
           auth: {
             token: token
           },
@@ -168,7 +462,7 @@ const OrdersPage = () => {
             title: '⚠️ انقطع الاتصال',
             description: 'انقطع الاتصال بالخادم',
             variant: 'destructive',
-            duration: 3000,
+            duration: 500,
           });
         });
 
@@ -204,12 +498,7 @@ const OrdersPage = () => {
           setOrders(prev => prev.map(order => 
             order._id === updatedOrder._id ? { 
               ...order, 
-              status: updatedOrder.status,
-              assignedDeliveryPerson: updatedOrder.assignedDeliveryPerson,
-              assignedAt: updatedOrder.assignedAt,
-              failureReason: updatedOrder.failureReason,
-              updatedAt: updatedOrder.updatedAt,
-              cancelledAt: updatedOrder.cancelledAt
+              ...updatedOrder
             } : order
           ));
           
@@ -271,8 +560,8 @@ const OrdersPage = () => {
             duration: 3000,
           });
         });
-
-      }).catch(error => {
+      
+      } catch (error) {
         console.error('Failed to load socket.io-client:', error);
         toast({
           title: 'خطأ',
@@ -280,16 +569,10 @@ const OrdersPage = () => {
           variant: 'destructive',
           duration: 3000,
         });
-      });
-    } catch (error) {
-      console.error('Socket initialization error:', error);
-      toast({
-        title: 'خطأ في الاتصال',
-        description: 'فشل في تهيئة الاتصال مع الخادم',
-        variant: 'destructive',
-        duration: 3000,
-      });
-    }
+      }
+    };
+
+    initializeSocket();
 
     return () => {
       if (socketInstance) {
@@ -297,296 +580,10 @@ const OrdersPage = () => {
         socketInstance.disconnect();
       }
     };
-  }, [toast]);
+  }, []); // Empty dependency array - only run once on mount
 
-  // Fetch orders function with proper error handling
-  const fetchOrders = async () => {
-    const token = getToken();
-    
-    if (!token) {
-      toast({
-        title: 'خطأ',
-        description: 'لم يتم العثور على رمز المصادقة، يرجى تسجيل الدخول مرة أخرى',
-        variant: 'destructive',
-      });
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      console.log('📡 Fetching orders...');
-      
-      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/orders/', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error('انتهت صلاحية جلسة المصادقة، يرجى تسجيل الدخول مرة أخرى');
-        }
-        throw new Error(`HTTP ${res.status}: فشل في تحميل الطلبات`);
-      }
-      
-      const data: ApiResponse = await res.json();
-      console.log('📦 Orders received:', data);
-      
-      // Handle different API response structures
-      let ordersList: Order[] = [];
-      if (data.orders) {
-        ordersList = data.orders;
-      } else if (data.data) {
-        ordersList = data.data;
-      } else if (Array.isArray(data)) {
-        ordersList = data;
-      }
-      
-      setOrders(ordersList);
-      
-    } catch (error: any) {
-      console.error('❌ Error fetching orders:', error);
-      toast({
-        title: 'خطأ',
-        description: error.message || 'فشل في تحميل الطلبات',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Rate delivery function
-  const rateDelivery = async (orderId: string, rating: number, feedback: string) => {
-    const token = getToken();
-    
-    if (!token) {
-      toast({
-        title: 'خطأ',
-        description: 'لم يتم العثور على رمز المصادقة',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      setSubmittingRating(true);
-      
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/delivery/rate/${orderId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          rating,
-          feedback
-        }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'فشل في تقييم المندوب');
-      }
-
-      setOrders(prev => prev.map(order => 
-        order._id === orderId ? { 
-          ...order, 
-          customerRating: rating, 
-          customerFeedback: feedback 
-        } : order
-      ));
-
-      toast({
-        title: '✅ تم التقييم بنجاح',
-        description: `تم تقييم مندوب توصيل طلب #${orderId.slice(-8)} بنجاح`,
-        duration: 3000,
-      });
-
-      setSelectedOrderForRating(null);
-      setRating(0);
-      setFeedback('');
-      
-    } catch (error: any) {
-      console.error('❌ Error rating delivery:', error);
-      toast({
-        title: 'خطأ',
-        description: error.message || 'فشل في تقييم المندوب',
-        variant: 'destructive',
-      });
-    } finally {
-      setSubmittingRating(false);
-    }
-  };
-
-  // Cancel order function
-  const cancelOrder = async (orderId: string) => {
-    if (!window.confirm('هل أنت متأكد من إلغاء هذا الطلب؟')) {
-      return;
-    }
-
-    const token = getToken();
-    
-    if (!token) {
-      toast({
-        title: 'خطأ',
-        description: 'لم يتم العثور على رمز المصادقة',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const reason = window.prompt('سبب الإلغاء (اختياري):') || '';
-      
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/cancel`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reason }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'فشل في إلغاء الطلب');
-      }
-
-      setOrders(prev => prev.map(order => 
-        order._id === orderId ? { 
-          ...order, 
-          status: 'cancelled',
-          cancelledAt: new Date().toISOString(),
-          failureReason: reason || 'تم الإلغاء بواسطة العميل'
-        } : order
-      ));
-
-      toast({
-        title: '✅ تم إلغاء الطلب',
-        description: `تم إلغاء طلب #${orderId.slice(-8)} بنجاح`,
-        duration: 3000,
-      });
-    } catch (error: any) {
-      console.error('❌ Error cancelling order:', error);
-      toast({
-        title: 'خطأ',
-        description: error.message || 'فشل في إلغاء الطلب',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Update order function
-  const updateOrder = async (orderId: string, order: Order) => {
-    const newAddress = window.prompt('أدخل عنوان التسليم الجديد:', order.deliveryAddress);
-    if (!newAddress) return;
-
-    const token = getToken();
-    
-    if (!token) {
-      toast({
-        title: 'خطأ',
-        description: 'لم يتم العثور على رمز المصادقة',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/orders/${orderId}/update`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          deliveryAddress: newAddress,
-          orderItems: order.orderItems
-        }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'فشل في تحديث الطلب');
-      }
-
-      setOrders(prev => prev.map(order => 
-        order._id === orderId ? { 
-          ...order, 
-          deliveryAddress: newAddress,
-          updatedAt: new Date().toISOString()
-        } : order
-      ));
-
-      toast({
-        title: '✅ تم تحديث الطلب',
-        description: `تم تحديث طلب #${orderId.slice(-8)} بنجاح`,
-        duration: 3000,
-      });
-    } catch (error: any) {
-      console.error('❌ Error updating order:', error);
-      toast({
-        title: 'خطأ',
-        description: error.message || 'فشل في تحديث الطلب',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Helper functions
-  const canModifyOrder = (status: string) => {
-    return status === 'pending';
-  };
-
-  const canRateOrder = (order: Order) => {
-    return order.status === 'delivered' && !order.customerRating && order.assignedDeliveryPerson;
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'processing': return <Clock className="h-4 w-4" />;
-      case 'cancelled':
-      case 'rejected': return <XCircle className="h-4 w-4" />;
-      case 'pending': return <Package className="h-4 w-4" />;
-      case 'assigned_to_delivery': return <UserCheck className="h-4 w-4" />;
-      case 'on_the_way': return <Truck className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'تم التسليم';
-      case 'processing': return 'قيد المعالجة';
-      case 'cancelled': return 'ملغي';
-      case 'rejected': return 'مرفوض';
-      case 'pending': return 'بانتظار المراجعة';
-      case 'assigned_to_delivery': return 'تم تخصيص مندوب';
-      case 'on_the_way': return 'في الطريق إليك';
-      default: return 'جديد';
-    }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'bg-green-100 text-green-800 border border-green-200';
-      case 'assigned_to_delivery':
-      case 'on_the_way':
-      case 'processing': return 'bg-blue-100 text-blue-800 border border-blue-200';
-      case 'cancelled':
-      case 'rejected': return 'bg-red-100 text-red-800 border border-red-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border border-gray-200';
-    }
-  };
-
-  // Star Rating Component
-  const StarRating = ({ rating, onRatingChange }: { rating: number; onRatingChange: (rating: number) => void }) => (
+  // Star Rating Component - memoized
+  const StarRating = useMemo(() => ({ rating, onRatingChange }: { rating: number; onRatingChange: (rating: number) => void }) => (
     <div className="flex gap-1 justify-center">
       {[1, 2, 3, 4, 5].map((star) => (
         <button
@@ -601,22 +598,22 @@ const OrdersPage = () => {
         </button>
       ))}
     </div>
-  );
+  ), []);
 
   // Fetch orders on component mount
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
-  // Refresh orders manually
-  const handleRefresh = () => {
+  // Refresh orders manually - memoized
+  const handleRefresh = useCallback(() => {
     fetchOrders();
     toast({
       title: '🔄 تحديث',
       description: 'جاري تحديث قائمة الطلبات...',
       duration: 1000,
     });
-  };
+  }, [fetchOrders, toast]);
 
   if (loading) {
     return (
@@ -721,8 +718,8 @@ const OrdersPage = () => {
                   {order.failureReason && (
                     <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
                       <p className="text-sm text-red-800">
-                        <span className="font-medium">سبب الرفض/الإلغاء: </span>
-                        {order.failureReason}
+                        <span className="font-medium">سبب الإلغاء: </span>
+                        {order.failureReason} الان
                       </p>
                     </div>
                   )}

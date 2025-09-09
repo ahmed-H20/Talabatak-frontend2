@@ -45,7 +45,7 @@ const AdminCategoriesPage = () => {
 
   const fetchCategories = async () => {
       try {
-        const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/categories', {
+        const res = await fetch('http://localhost:5000/api/categories', {
           headers: {
             'Content-Type': 'application/json',
             ...(token && { Authorization: `Bearer ${token}` }),
@@ -72,7 +72,7 @@ const AdminCategoriesPage = () => {
   //Add sub
   const handleAddSubCategory = async() => {
     try {
-        const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/subcategories', {
+        const res = await fetch('http://localhost:5000/api/subcategories', {
           method:"POST",
           headers: {
             'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ const AdminCategoriesPage = () => {
   const handleAddCategory = async() => {
     console.log(categoryData)
      try {
-        const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/categories', {
+        const res = await fetch('http://localhost:5000/api/categories', {
           method:"POST",
           headers: {
             'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ const AdminCategoriesPage = () => {
   //Edit Cat - Updated to include image
   const handleEditCategory = async() => {
     try {
-        const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/categories/${categoryData.id}`, {
+        const res = await fetch(`http://localhost:5000/api/categories/${categoryData.id}`, {
           method:"PUT",
           headers: {
             'Content-Type': 'application/json',
@@ -178,7 +178,7 @@ const AdminCategoriesPage = () => {
   //Delete Category
   const handleDeleteCategory = async(categoryId: string) => {
    try{
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/categories/${categoryId}`, {
+      const res = await fetch(`http://localhost:5000/api/categories/${categoryId}`, {
         method: 'DELETE',  
         headers: {
             'Content-Type': 'application/json',
@@ -201,7 +201,7 @@ const AdminCategoriesPage = () => {
   //Delete subCat
   const handleDeleteSubCategory = async(subCategoryId: string) => {
     try{
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/subcategories/${subCategoryId}`, {
+      const res = await fetch(`http://localhost:5000/api/subcategories/${subCategoryId}`, {
         method: 'DELETE',  
         headers: {
             'Content-Type': 'application/json',

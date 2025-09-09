@@ -42,7 +42,7 @@ const AdminDeliveryManagement = () => {
 
   // API call helper
   const apiCall = async (url, options = {}) => {
-    const response = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api${url}`, {
+    const response = await fetch(`http://localhost:5000/api${url}`, {
       headers: {
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -51,8 +51,9 @@ const AdminDeliveryManagement = () => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'حدث خطأ');
+      const data = await response.json();
+      toast(data.message || 'حدث خطأ');
+      throw new Error(data.message || 'حدث خطأ');
     }
 
     return response.json();

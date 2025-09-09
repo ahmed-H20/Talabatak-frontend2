@@ -44,6 +44,7 @@ const AdminCouponsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [Errors, setError] = useState<{ [key: string]: string }>({});
   const [formData, setFormData] = useState({
     name: '',
     expire: '',
@@ -63,42 +64,57 @@ const AdminCouponsPage = () => {
 
   // Fetch coupons
   const fetchCoupons = async () => {
-    try {
-      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/coupons/getCoupons', {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-      if (!res.ok) {
-        throw new Error('فشل في تحميل الكوبونات');
-      }
-      const data = await res.json();
-      setCoupons(data.data);
-    } catch (error) {
-      toast({
-        title: 'خطأ',
-        description: 'فشل في تحميل الكوبونات',
-        variant: 'destructive',
-      });
+  try {
+    const res = await fetch('http://localhost:5000/api/coupons/getCoupons', {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || 'فشل في جلب الكوبونات');
     }
-  };
+
+    setCoupons(data.data);
+  } catch (error) {
+    toast({
+      title: 'خطأ',
+      description: error.message,
+      variant: 'destructive',
+    });
+    console.error('فشل في جلب الكوبونات:', error.message);
+  }
+};
+
 
   // Fetch stores
   const fetchStores = async () => {
     try {
-      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/stores', {
+      const res = await fetch('http://localhost:5000/api/stores', {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setStores(data.data || []);
+      
+      const data = await res.json();
+      setStores(data.data || []);
+      
+
+      if (!res.ok) {
+        throw new Error(data.message || 'فشل في جلب المتاجر');
       }
     } catch (error) {
       console.log('Failed to fetch stores');
+      toast({
+        title: 'خطأ',
+        description: error.message,
+        variant: 'destructive',
+      });
+      console.error('فشل في جلب المتاجر:', error.message);
     }
   };
 
@@ -117,8 +133,8 @@ const AdminCouponsPage = () => {
     
     try {
       const url = editingCoupon 
-        ? `https://talabatak-backend2-zw4i.onrender.com/api/coupons/update/${editingCoupon.id}`
-        : 'https://talabatak-backend2-zw4i.onrender.com/api/coupons/create';
+        ? `http://localhost:5000/api/coupons/update/${editingCoupon.id}`
+        : 'http://localhost:5000/api/coupons/create';
       
       const method = editingCoupon ? 'PUT' : 'POST';
       
@@ -170,7 +186,7 @@ const AdminCouponsPage = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/coupons/delete/${id}`, {
+      const res = await fetch(`http://localhost:5000/api/coupons/delete/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

@@ -15,6 +15,7 @@ import { Plus, Search, Edit, Trash2, MapPin, Phone, Clock, Eye, Truck, Package, 
 import { MapContainer, TileLayer, Marker, useMapEvents, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { toast } from 'sonner';
 
 // Fix marker icon issue in leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -87,6 +88,7 @@ interface Product {
 }
 
 const getCityNameFromCoordinates = async (coordinates: [number, number]): Promise<string | null> => {
+  
   try {
     // coordinates is [longitude, latitude] in GeoJSON format
     const [lng, lat] = coordinates;
@@ -94,7 +96,11 @@ const getCityNameFromCoordinates = async (coordinates: [number, number]): Promis
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
     );
 
-    if (!response.ok) throw new Error("Failed to fetch city name");
+    if (!response.ok) {
+      const data = await response.json();
+      console.error("Nominatim API error:", data);
+      throw new Error("Failed to fetch city name");      
+    }
 
     const data = await response.json();
     const city: string =
@@ -106,6 +112,11 @@ const getCityNameFromCoordinates = async (coordinates: [number, number]): Promis
 
     return city || "فشل ايجاد المدينة";
   } catch (error) {
+    toast({
+      title: 'خطأ',
+      description: error.message || 'فشل في ايجاد المدينة',
+      variant: 'destructive',
+    });
     console.error("Error in getCityNameFromCoordinates:", error);
     return "فشل ايجاد المدينة";
   }
@@ -180,16 +191,24 @@ const AdminStoresPage = () => {
 
   const fetchStores = async () => {
     try {
-      const res = await fetch('https://talabatak-backend2-zw4i.onrender.com/api/stores', {
+      const res = await fetch('http://localhost:5000/api/stores', {
         headers: {
           'Content-Type': 'application/json',                    
           ...(token && { Authorization: `Bearer ${token}` }),
         },
       });
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'فشل في جلب المتاجر');
+      }
       setStores(data.data);
     } catch (error) {
-      toast({ title: 'فشل في تحميل المتاجر', description: String(error) });
+      toast({
+        title: 'خطأ',
+        description: error.message || error.error || 'فشل في تحميل المتاجر',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -210,7 +229,7 @@ const AdminStoresPage = () => {
     console.log(formData);
     if (editingStore) {
       try {
-        const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores/${editingStore._id}`, {
+        const res = await fetch(`http://localhost:5000/api/stores/${editingStore._id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -227,8 +246,8 @@ const AdminStoresPage = () => {
         });
         if (!res.ok) {
           console.log("Store not updated");
-          toast({ title: 'خطأ فى تحديث المتجر' });
-          return
+          const data = await res.json();
+          throw new Error(data.message || data.error || 'فشل في تحديث المتجر ليس لديك صلاحية لذلك');
         }
         const data = await res.json();
         console.log("Store updated successfully", data);
@@ -238,11 +257,16 @@ const AdminStoresPage = () => {
         setEditingStore(null);               
       }
       catch (error) {
-        toast({ title: 'فشل في تحديث المتجر', description: String(error) });
+        console.error("Error updating store:", error);
+        toast({
+          title: 'خطأ',
+          description: error.message || 'فشل في تحديث المتجر ليس لديك صلاحية لذلك',
+          variant: 'destructive',
+        });
       }
     } else {
       try {
-        const res = await fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores`, {
+        const res = await fetch(`http://localhost:5000/api/stores`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -259,8 +283,8 @@ const AdminStoresPage = () => {
         });
         if (!res.ok) {
           console.log("Store not Created");
-          toast({ title: 'فشل اضافة المتجر' });
-          return
+          const errorData = await res.json();
+          throw new Error(errorData.message || errorData.error || 'فشل في اضافة المتجر ليس لديك صلاحية لذلك');
         }
         const data = await res.json();
         console.log("Store created successfully", data);
@@ -270,7 +294,11 @@ const AdminStoresPage = () => {
         setEditingStore(null);               
       }
       catch (error) {
-        toast({ title: 'فشل في اضافة المتجر', description: String(error) });
+        toast({
+          title: 'خطأ',
+          description: error.message || 'فشل في اضافة المتجر ليس لديك صلاحية لذلك',
+          variant: 'destructive',
+        });
       }
     }
     
@@ -324,7 +352,7 @@ const AdminStoresPage = () => {
 
   const handleDelete = (id: string) => {
     // Call API to delete store
-    fetch(`https://talabatak-backend2-zw4i.onrender.com/api/stores/${id}`, {
+    fetch(`http://localhost:5000/api/stores/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -336,7 +364,11 @@ const AdminStoresPage = () => {
       toast({ title: "تم حذف المتجر بنجاح" });
     })
     .catch((error) => {
-      toast({ title: "فشل في حذف المتجر", description: String(error) });
+      toast({
+        title: 'خطأ',
+        description: error.message || 'فشل في حذف المتجر ليس لديك صلاحية لذلك',
+        variant: 'destructive',
+      });
     });
   };
 
